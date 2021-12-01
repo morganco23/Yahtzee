@@ -87,7 +87,7 @@ static int dieScore[5] = {0,0,0,0,0};
 
 
 // Variables used to control the game
-static int scores[2][13] = { {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1},{-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1} };
+static int scores[2][13] = { {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1}, {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1} };
 static int playerNum;
 static int runningSum = 0;
 static bool playerWon = false;
@@ -562,10 +562,22 @@ static void drawScore() {
     model_view = mvstack.pop();
 
     mvstack.push(model_view);
-    model_view *= Translate(-4, 20, -23.5);
+    model_view *= Translate(-6, 20, -23.5);
     // draw my scores
     for (int i = 0; i < 13; i++) {
         std::string valuestr = std::to_string(scores[0][i]);
+        const char* value = &valuestr[0];
+        drawText(value);
+        model_view *= Translate(0, -3, 0);
+    }
+
+    model_view = mvstack.pop();
+
+    mvstack.push(model_view);
+    model_view *= Translate(20, 20, -23.5);
+    // draw ai scores
+    for (int i = 0; i < 13; i++) {
+        std::string valuestr = std::to_string(scores[1][i]);
         const char* value = &valuestr[0];
         drawText(value);
         model_view *= Translate(0, -3, 0);
