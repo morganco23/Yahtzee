@@ -44,16 +44,6 @@ static color4 BLACK(0.0,0.0,0.0,1.0);
 static color4 BROWN(0.7,0.7,0.7,1.0);
 
 // Vertices of a unit cube centered at origin, sides aligned with axes
-static point4 vertices[8] = {
-    point4( -0.5, -0.5,  0.5, 1.0 ),
-    point4( -0.5,  0.5,  0.5, 1.0 ),
-    point4(  0.5,  0.5,  0.5, 1.0 ),
-    point4(  0.5, -0.5,  0.5, 1.0 ),
-    point4( -0.5, -0.5, -0.5, 1.0 ),
-    point4( -0.5,  0.5, -0.5, 1.0 ),
-    point4(  0.5,  0.5, -0.5, 1.0 ),
-    point4(  0.5, -0.5, -0.5, 1.0 )
-};
 
 // Array of rotation angles (in degrees) for each coordinate axis;
 // These are used in rotating the cube.
@@ -81,13 +71,17 @@ static GLfloat lightAngle = 0.0; // the current lighting angle
 static float gravity = -.05;
 static float resistance = 2;
 static bool die1Moving = true;
-static float die1Position[] = { 0,2,0 };
+static bool dieMoving[5] = { true, true, true, true, true };
+static float diePositions[5][3] = { {3,0,0} ,{1.5,0,0} ,{0,0,0} ,{-1.5,0,0} ,{-3,0,0} };
 
 static mat4 rotmat = RotateX(0);
-static float die1Velocity[] = { 0,0,0};
-static float die1Rotation[] = { 0,0,0 };
-static float die1AngularVelocity[] = { 4,3,0 };
-static int numBounces1 = 0;
+static float dieVelocities[5][3] = { {0,0,0} ,{0,0,0} ,{0,0,0} ,{0,0,0} ,{0,0,0} };
+
+static float dieRotaions[5][3] = { {0,0,0} ,{0,0,0} ,{0,0,0} ,{0,0,0} ,{0,0,0} };
+static float dieOmegas[5][3] = { {0,0,0} ,{0,0,0} ,{0,0,0} ,{0,0,0} ,{0,0,0} };
+
+static float diebounces[5] = { 0,0,0,0,0 };
+
 
 // Variables used to control the game
 static int scores[2] = { 0,0 };
@@ -97,11 +91,203 @@ static bool playerWon = false;
 static int whowon = 0;
 //----------------------------------------------------------------------------
 
+static point4 vertices[178] = {
 
+    //for dice cube
+    point4(-0.5, -0.5,  0.5, 1.0), //bottom left corner
+    point4(-0.5,  0.5,  0.5, 1.0), //top left corner
+    point4(0.5,  0.5,  0.5, 1.0), //top right corner
+    point4(0.5, -0.5,  0.5, 1.0), //bottom right corner
+    point4(-0.5, -0.5, -0.5, 1.0),
+    point4(-0.5,  0.5, -0.5, 1.0),
+    point4(0.5,  0.5, -0.5, 1.0),
+    point4(0.5, -0.5, -0.5, 1.0),
+
+    //for face 1 (facing front of cube) (vertexes 8-15)
+    point4(-0.1, -0.1, 0.501, 1.0),
+    point4(-0.1, 0.1, 0.501, 1.0),
+    point4(0.1, 0.1, 0.501, 1.0),
+    point4(0.1, -0.1, 0.501, 1.0),
+    point4(-0.1, -0.1, 0.5, 1.0),
+    point4(-0.1, 0.1, 0.5, 1.0),
+    point4(0.1, 0.1, 0.5, 1.0),
+    point4(0.1, -0.1, 0.5, 1.0),
+
+    //for face 2 (face back of cube) (vertexes 16-31)
+    point4(-0.4, -0.4, -0.501, 1.0),//bottom left cube
+    point4(-0.4, -0.2, -0.501, 1.0),
+    point4(-0.2, -0.2, -0.501, 1.0),
+    point4(-0.2, -0.4, -0.501, 1.0),
+    point4(-0.4, -0.4, -0.5, 1.0),
+    point4(-0.4, -0.2, -0.5, 1.0),
+    point4(-0.2, -0.2, -0.5, 1.0),
+    point4(-0.2, -0.4, -0.5, 1.0),
+    point4(0.2, 0.2, -0.501, 1.0), //top right cube
+    point4(0.2, 0.4, -0.501, 1.0),
+    point4(0.4, 0.4, -0.501, 1.0),
+    point4(0.4, 0.2, -0.501, 1.0),
+    point4(0.2, 0.2, -0.5, 1.0),
+    point4(0.2, 0.4, -0.5, 1.0),
+    point4(0.4, 0.4, -0.5, 1.0),
+    point4(0.4, 0.2, -0.5, 1.0),
+
+    //for face 3 (face bottom of cube) (vertexes 32-55)
+    point4(-0.4, -0.501, -0.4, 1.0),//bottom left cube
+    point4(-0.4, -0.501, -0.2, 1.0),
+    point4(-0.2, -0.501, -0.2, 1.0),
+    point4(-0.2, -0.501, -0.4, 1.0),
+    point4(-0.4, -0.5, -0.4, 1.0),
+    point4(-0.4, -0.5, -0.2, 1.0),
+    point4(-0.2, -0.5, -0.2, 1.0),
+    point4(-0.2, -0.5, -0.4, 1.0),
+    point4(0.2, -0.501, 0.2, 1.0), //top right cube
+    point4(0.2, -0.501, 0.4, 1.0),
+    point4(0.4, -0.501, 0.4, 1.0),
+    point4(0.4, -0.501, 0.2, 1.0),
+    point4(0.2, -0.5, 0.2, 1.0),
+    point4(0.2, -0.5, 0.4, 1.0),
+    point4(0.4, -0.5, 0.4, 1.0),
+    point4(0.4, -0.5, 0.2, 1.0),
+    point4(-0.1, -0.501, -0.1, 1.0), //middle cube
+    point4(-0.1, -0.501, 0.1, 1.0),
+    point4(0.1, -0.501, 0.1, 1.0),
+    point4(0.1, -0.501, -0.1, 1.0),
+    point4(-0.1, -0.5, -0.1, 1.0),
+    point4(-0.1, -0.5, 0.1, 1.0),
+    point4(0.1, -0.5, 0.1, 1.0),
+    point4(0.1, -0.5, -0.1, 1.0),
+
+    //for face 4 (face top of cube) (vertexes 56-87)
+    point4(-0.4, 0.501, -0.4, 1.0),//bottom left cube
+    point4(-0.4, 0.501, -0.2, 1.0),
+    point4(-0.2, 0.501, -0.2, 1.0),
+    point4(-0.2, 0.501, -0.4, 1.0),
+    point4(-0.4, 0.5, -0.4, 1.0),
+    point4(-0.4, 0.5, -0.2, 1.0),
+    point4(-0.2, 0.5, -0.2, 1.0),
+    point4(-0.2, 0.5, -0.4, 1.0),
+    point4(-0.4, 0.501, 0.2, 1.0),//top left cube
+    point4(-0.4, 0.501, 0.4, 1.0),
+    point4(-0.2, 0.501, 0.4, 1.0),
+    point4(-0.2, 0.501, 0.2, 1.0),
+    point4(-0.4, 0.5, 0.2, 1.0),
+    point4(-0.4, 0.5, 0.4, 1.0),
+    point4(-0.2, 0.5, 0.4, 1.0),
+    point4(-0.2, 0.5, 0.2, 1.0),
+    point4(0.2, 0.501, 0.2, 1.0), //top right cube
+    point4(0.2, 0.501, 0.4, 1.0),
+    point4(0.4, 0.501, 0.4, 1.0),
+    point4(0.4, 0.501, 0.2, 1.0),
+    point4(0.2, 0.5, 0.2, 1.0),
+    point4(0.2, 0.5, 0.4, 1.0),
+    point4(0.4, 0.5, 0.4, 1.0),
+    point4(0.4, 0.5, 0.2, 1.0),
+    point4(0.2, 0.501, -0.4, 1.0), //bottom right cube
+    point4(0.2, 0.501, -0.2, 1.0),
+    point4(0.4, 0.501, -0.2, 1.0),
+    point4(0.4, 0.501, -0.4, 1.0),
+    point4(0.2, 0.5, -0.4, 1.0),
+    point4(0.2, 0.5, -0.2, 1.0),
+    point4(0.4, 0.5, -0.2, 1.0),
+    point4(0.4, 0.5, -0.4, 1.0),
+
+    //for face 5 (face left of cube) (vertexes 88-127)
+    point4(0.501, -0.1, -0.1, 1.0), //middle cube
+    point4(0.501, -0.1, 0.1, 1.0),
+    point4(0.501, 0.1, 0.1, 1.0),
+    point4(0.501, 0.1, -0.1, 1.0),
+    point4(0.5, -0.1, -0.1, 1.0),
+    point4(0.5, -0.1, 0.1, 1.0),
+    point4(0.5, 0.1, 0.1, 1.0),
+    point4(0.5, 0.1, -0.1, 1.0),
+    point4(0.501, -0.4, -0.4, 1.0),//bottom left cube
+    point4(0.501, -0.4, -0.2, 1.0),
+    point4(0.501, -0.2, -0.2, 1.0),
+    point4(0.501, -0.2, -0.4, 1.0),
+    point4(0.5, -0.4, -0.4, 1.0),
+    point4(0.5, -0.4, -0.2, 1.0),
+    point4(0.5, -0.2, -0.2, 1.0),
+    point4(0.5, -0.2, -0.4, 1.0),
+    point4(0.501, -0.4, 0.2, 1.0),//top left cube
+    point4(0.501, -0.4, 0.4, 1.0),
+    point4(0.501, -0.2, 0.4, 1.0),
+    point4(0.501, -0.2, 0.2, 1.0),
+    point4(0.5, -0.4, 0.2, 1.0),
+    point4(0.5, -0.4, 0.4, 1.0),
+    point4(0.5, -0.2, 0.4, 1.0),
+    point4(0.5, -0.2, 0.2, 1.0),
+    point4(0.501, 0.2, 0.2, 1.0), //top right cube
+    point4(0.501, 0.2, 0.4, 1.0),
+    point4(0.501, 0.4, 0.4, 1.0),
+    point4(0.501, 0.4, 0.2, 1.0),
+    point4(0.5, 0.2, 0.2, 1.0),
+    point4(0.5, 0.2, 0.4, 1.0),
+    point4(0.5, 0.4, 0.4, 1.0),
+    point4(0.5, 0.4, 0.2, 1.0),
+    point4(0.501, 0.2, -0.4, 1.0), //bottom right cube
+    point4(0.501, 0.2, -0.2, 1.0),
+    point4(0.501, 0.4, -0.2, 1.0),
+    point4(0.501, 0.4, -0.4, 1.0),
+    point4(0.5, 0.2, -0.4, 1.0),
+    point4(0.5, 0.2, -0.2, 1.0),
+    point4(0.5, 0.4, -0.2, 1.0),
+    point4(0.5, 0.4, -0.4, 1.0),
+
+    //for face 6 (face right of cube) (vertexes 128-175)
+    point4(-0.501, -0.4, -0.4, 1.0),//bottom left cube
+    point4(-0.501, -0.4, -0.2, 1.0),
+    point4(-0.501, -0.2, -0.2, 1.0),
+    point4(-0.501, -0.2, -0.4, 1.0),
+    point4(-0.5, -0.4, -0.4, 1.0),
+    point4(-0.5, -0.4, -0.2, 1.0),
+    point4(-0.5, -0.2, -0.2, 1.0),
+    point4(-0.5, -0.2, -0.4, 1.0),
+    point4(-0.501, -0.4, -0.1, 1.0),//mid left cube
+    point4(-0.501, -0.4, 0.1, 1.0),
+    point4(-0.501, -0.2, 0.1, 1.0),
+    point4(-0.501, -0.2, -0.1, 1.0),
+    point4(-0.5, -0.4, -0.1, 1.0),
+    point4(-0.5, -0.4, 0.1, 1.0),
+    point4(-0.5, -0.2, 0.1, 1.0),
+    point4(-0.5, -0.2, -0.1, 1.0),
+    point4(-0.501, -0.4, 0.2, 1.0),//top left cube
+    point4(-0.501, -0.4, 0.4, 1.0),
+    point4(-0.501, -0.2, 0.4, 1.0),
+    point4(-0.501, -0.2, 0.2, 1.0),
+    point4(-0.5, -0.4, 0.2, 1.0),
+    point4(-0.5, -0.4, 0.4, 1.0),
+    point4(-0.5, -0.2, 0.4, 1.0),
+    point4(-0.5, -0.2, 0.2, 1.0),
+    point4(-0.501, 0.2, 0.2, 1.0),//top right cube
+    point4(-0.501, 0.2, 0.4, 1.0),
+    point4(-0.501, 0.4, 0.4, 1.0),
+    point4(-0.501, 0.2, 0.2, 1.0),
+    point4(-0.5, 0.2, 0.2, 1.0),
+    point4(-0.5, 0.2, 0.4, 1.0),
+    point4(-0.5, 0.4, 0.4, 1.0),
+    point4(-0.5, 0.4, 0.2, 1.0),
+    point4(-0.501, 0.2, -0.1, 1.0), //mid right cube
+    point4(-0.501, 0.2, 0.1, 1.0),
+    point4(-0.501, 0.4, 0.1, 1.0),
+    point4(-0.501, 0.4, -0.1, 1.0),
+    point4(-0.5, 0.2, -0.1, 1.0),
+    point4(-0.5, 0.2, 0.1, 1.0),
+    point4(-0.5, 0.4, 0.1, 1.0),
+    point4(-0.5, 0.4, -0.1, 1.0),
+    point4(-0.501, 0.2, -0.4, 1.0), //bottom right cube
+    point4(-0.501, 0.2, -0.2, 1.0),
+    point4(-0.501, 0.4, -0.2, 1.0),
+    point4(-0.501, 0.4, -0.4, 1.0),
+    point4(-0.5, 0.2, -0.4, 1.0),
+    point4(-0.5, 0.2, -0.2, 1.0),
+    point4(-0.5, 0.4, -0.2, 1.0),
+    point4(-0.5, 0.4, -0.4, 1.0),
+
+};
 
 // variable used in generating the vertices for our objects
 static int Index = 0;
-static int idxarr[2] = { 60,NumVertices };
+static int idxarr[2] = { 1000,NumVertices };
 
 // quad generates a square (of our cube) using two triangles
 //
@@ -187,16 +373,28 @@ invquad(int a, int b, int c, int d, color4 col, GLfloat shininess)
     Index++;
 }
 
+
+
 // creates a cug with each face having difference color/shininess properties
-static void
-colorcube()
+static void colorcube()
 {
-    quad( 1, 0, 3, 2, RED, 1);
-    quad( 2, 3, 7, 6, GRAY, 30);
-    quad( 3, 0, 4, 7, GREEN, 300);
-    quad( 6, 5, 1, 2, CYAN, 1);
-    quad( 4, 5, 6, 7, YELLOW,30);
-    quad( 5, 4, 0, 1, BLUE, 300);
+    //draw cube
+    quad(1, 0, 3, 2, GRAY, 100);
+    quad(2, 3, 7, 6, GRAY, 100);
+    quad(3, 0, 4, 7, GRAY, 100);
+    quad(6, 5, 1, 2, GRAY, 100);
+    quad(4, 5, 6, 7, GRAY, 100);
+    quad(5, 4, 0, 1, GRAY, 100);
+
+    for (int i = 8; i < 176; i += 8) { //draw the dots on the dice
+        quad(i + 1, i, i + 3, i + 2, BLACK, 100);
+        quad(i + 2, i + 3, i + 7, i + 6, BLACK, 100);
+        quad(i + 3, i + 0, i + 4, i + 7, BLACK, 100);
+        quad(i + 6, i + 5, i + 1, i + 2, BLACK, 100);
+        quad(i + 4, i + 5, i + 6, i + 7, BLACK, 100);
+        quad(i + 5, i + 4, i + 0, i + 1, BLACK, 100);
+    }
+
 }
 
 //----------------------------------------------------------------------------
@@ -226,18 +424,18 @@ static void updateLightPosition() {
 //----------------------------------------------------------------------------
 
 static void
-generateRandomVelocities(int max) {
+generateRandomVelocities(int max,int dieNum) {
     for (int i = 0; i < 3; i++) {
         if (i != 2) {
-            die1Velocity[i] = static_cast <float> (rand() % max);
-            std::cout << "set random velocity " << i << " to " << die1Velocity[i] << std::endl;
+            dieVelocities[dieNum][i] = static_cast <float> (rand() % max);
+            //std::cout << "set random velocity " << i << " to " << die1Velocity[i] << std::endl;
         }
     }
 }
 
-static void generateRandomRotationV() {
+static void generateRandomRotationV(int dieNum) {
     for (int i = 0; i < 3; i++) {
-        die1AngularVelocity[i] = rand() % 10;
+        dieOmegas[dieNum][i] = rand() % 10;
     }
 }
 
@@ -250,46 +448,44 @@ static void drawBoundingBox() {
 
     glUniformMatrix4fv(ModelView, 1, GL_TRUE, model_view);
 
-    glDrawArrays(GL_TRIANGLES, 36, 60);
+    glDrawArrays(GL_TRIANGLES, 792,24);
     model_view = mvstack.pop();
 }
 
+static void drawText(const char* text) {
+    mvstack.push(model_view);
+    for (int i = 0; i < strlen(text); i++) {
+        model_view *= Translate(1.25, 0, 0);
+        glUniformMatrix4fv(ModelView, 1, GL_TRUE, model_view);
+        glDrawArrays(GL_TRIANGLES, charInfo[text[i]][0], charInfo[text[i]][1]);
+    }
+    mvstack.pop();
+};
+
 static void drawScore() {
     mvstack.push(model_view);
-    const char* yourturn = "Your Turn!";
-    const char* youlost = "You Lost";
-    const char* youwin = "You Win";
+    const char* yourScoreCard = "Your Score Card:";
+    const char* aiScoreCard = "AI Score Card:";
 
-    model_view *= Translate(-4, 6, -3);
-    model_view *= Scale(.33, .33, .33);
-    if (playerWon) {
-        if (whowon == 0) {
-            for (int i = 0; i < strlen(youwin); i++) {
-                model_view *= Translate(1.25, 0, 0);
-                glUniformMatrix4fv(ModelView, 1, GL_TRUE, model_view);
-                glDrawArrays(GL_TRIANGLES, charInfo[youwin[i]][0], charInfo[youwin[i]][1]);
+    const char* oneLabel = "One";
+    const char* twoLabel = "Two";
+    const char* threeLabel = "Three";
+    const char* fourLabel = "Four";
+    const char* fiveLabel = "Five";
+    const char* sizLabel = "Six";
 
-            }
-        }
-        else
-        {
-            for (int i = 0; i < strlen(youlost); i++) {
-                model_view *= Translate(1.25, 0, 0);
-                glUniformMatrix4fv(ModelView, 1, GL_TRUE, model_view);
-                glDrawArrays(GL_TRIANGLES, charInfo[youlost[i]][0], charInfo[youlost[i]][1]);
+    const char* tokLabel = "3 of a kind";
+    const char* fokLabel = "4 of a kind";
+    const char* fhLabel = "Full house";
+    const char* ssLabel = "Small straight";
+    const char* lsLabel = "Large straight";
+    const char* yzeLabel = "YAHTZEE";
+    const char* bonus = "Bonus";
 
-            }
-        }
-        
-    }
-    else {
-        for (int i = 0; i < strlen(yourturn); i++) {
-            model_view *= Translate(1.25, 0, 0);
-            glUniformMatrix4fv(ModelView, 1, GL_TRUE, model_view);
-            glDrawArrays(GL_TRIANGLES, charInfo[yourturn[i]][0], charInfo[yourturn[i]][1]);
+    drawText(yourScoreCard);
+    
 
-        }
-    }
+
     model_view = mvstack.pop();
 
     mvstack.push(model_view);
@@ -336,7 +532,6 @@ static void drawScore() {
 static void
 display( void )
 {
-
     
     // set all to background color
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -348,27 +543,29 @@ display( void )
     mvstack.push(model_view);
 
     // perform translations on the die
-    model_view *= Translate(die1Position[0], die1Position[1], die1Position[2]);
-    model_view *= RotateX(die1Rotation[0]);
-    model_view *= RotateY(die1Rotation[1]);
-    model_view *= RotateZ(die1Rotation[2]);
-    
-    
-    
-    // update the light position based on the light-rotation information
-    updateLightPosition();
-    
-    // send uniform matrix variables to the GPU
-    glUniformMatrix4fv( ModelViewStart, 1, GL_TRUE, model_view_start );
-    glUniformMatrix4fv( ModelView, 1, GL_TRUE, model_view );
+    for (int i = 0; i < 5; i++) {
+        mvstack.push(model_view);
+        model_view *= Translate(diePositions[i][0], diePositions[i][1], diePositions[i][2]);
+        model_view *= RotateX(dieRotaions[i][0]);
+        model_view *= RotateY(dieRotaions[i][1]);
+        model_view *= RotateZ(dieRotaions[i][2]);
 
-    // emit the cube to the scene
-    setPickId(1); // set pick-id, in case we're picking
-    glDrawArrays( GL_TRIANGLES, 0, 36);
-    clearPickId(); // clear pick-id
+        // update the light position based on the light-rotation information
+        updateLightPosition();
+
+        // send uniform matrix variables to the GPU
+        glUniformMatrix4fv(ModelViewStart, 1, GL_TRUE, model_view_start);
+        glUniformMatrix4fv(ModelView, 1, GL_TRUE, model_view);
+
+        // emit the cube to the scene
+        setPickId(1); // set pick-id, in case we're picking
+        glDrawArrays(GL_TRIANGLES, 0, 800);
+        clearPickId(); // clear pick-id
+        model_view = mvstack.pop();
+    }
     
     
-    model_view = mvstack.pop();
+    
 
     drawBoundingBox();
 
@@ -382,17 +579,18 @@ display( void )
     else {
         glutSwapBuffers();
     }
+    model_view = mvstack.pop();
 }
 
 // picking-finished callback: stop rotation if the cube has beenn selected
 void scenePickingFcn(int code) {
     if (code == 1) { // the cube
-        if (!die1Moving) {
-            die1Moving = true;
-            die1Position[1] = 2;
-            numBounces1 = 0;
-            generateRandomVelocities(2);
-            generateRandomRotationV();
+        if (!dieMoving[code - 1]) {
+            dieMoving[code - 1] = true;
+            diePositions[code - 1][1] = 2;
+            diebounces[code - 1] = 0;
+            generateRandomVelocities(2,0);
+            generateRandomRotationV(0);
         }
     }
     else {
@@ -487,19 +685,40 @@ calculatePoints() {
 
 }
 
+static bool isWithinRadius(float pos1[3], float pos2[3], float radius) {
+    float sum = 0;
+    for (int i = 0; i < 3; i++) {
+        sum += (pos2[i] - pos1[i]) * (pos2[i] - pos1[i]);
+    }
+    return sqrt(sum) <= radius;
+}
 
+static void applyCollisions() {
+    for (int i = 0; i < 5; i++) {
+        for (int j = i + 1; j < 5; j++) {
+            if (isWithinRadius(diePositions[i], diePositions[j], 1)) {
+                std::cout << "colliding" << std::endl;
+            }
+        }
+    }
+}
 
 // timer function, called when the timer has ticked
 static void
 tick(int n)
 {
+    srand(time(NULL));
+
     glutTimerFunc(n, tick, n); // schedule next tick
 
     // change the appropriate axis based on spin-speed
     //Theta[Axis] += spinSpeed;
-    
-    float speedsquared = die1Velocity[0] * die1Velocity[0] + die1Velocity[1] *
-        die1Velocity[1] + die1Velocity[2] * die1Velocity[2];
+    float speeds[5] = { 0,0,0,0,0 };
+    for (int i = 0; i < 5; i++) {
+        speeds[i] = dieVelocities[i][0] * dieVelocities[i][0] + dieVelocities[i][1] *
+            dieVelocities[i][1] + dieVelocities[i][2] * dieVelocities[i][2];
+    }
+
 
     if (scores[0] >= 100) {
         whowon = 0;
@@ -511,76 +730,101 @@ tick(int n)
     }
     //std::cout << "X Rotation" << die1Rotation[0] << ", Y Rotation: " << die1Rotation[1] << std::endl;
     // update the position of the die by the different velocities
-    if (die1Moving) {
-        die1Velocity[1] += gravity;
-        
-        // all of the bouncing off of the wall conditions
-        if (die1Position[0] > 3.75 || die1Position[0] < -3.75) {
-            die1Velocity[0] = -die1Velocity[0];
-            //give random rotaional velocity
-            std::cout << "bounced of the x wall" << std::endl;
-            generateRandomRotationV();
-        }
-        if (die1Position[2] > 3.75 || die1Position[2] < -3.75) {
-            die1Velocity[2] = -die1Velocity[2];
-            std::cout << "bounced of the z wall" << std::endl;
-            //give random rotaional velocity
-            generateRandomRotationV();
-        }
+    for (int i = 0; i < 5; i++) {
+        if (dieMoving[i]) {
+            dieVelocities[i][1] += gravity;
 
-        //we hit the ground. lets bounce
-        if (die1Position[1] <=-4.25) {
-            if (speedsquared < 0.02 || numBounces1 > 3) {
-                die1Moving = false;
-                // set the die on 1 face stead of on a point
+            // all of the bouncing off of the wall conditions
+            if (diePositions[i][0] > 3.75 || diePositions[i][0] < -3.75) {
+                diePositions[i][0] = -dieVelocities[i][0];
+                //give random rotaional velocity
+                std::cout << "bounced of the x wall" << std::endl;
+                generateRandomRotationV(i);
+            }
+            if (diePositions[i][2] > 3.75 || diePositions[i][2] < -3.75) {
+                diePositions[i][2] = -dieVelocities[i][2];
+                std::cout << "bounced of the z wall" << std::endl;
+                //give random rotaional velocity
+                generateRandomRotationV(i);
+            }
 
-                
+            applyCollisions();
 
-                int val;
-                for (int i = 0; i < 3; i++) {
-                    
-                    val = static_cast <int> (die1Rotation[i]) % 90;
-                    if (val > 45) {
-                        val = static_cast <int> (die1Rotation[i]) % 90;
+            //we hit the ground. lets bounce
+            if (diePositions[i][1] <= -4.25) {
+                if (speeds[i] < 0.02 || diebounces[i] > 3) {
+                    dieMoving[i] = false;
+                    // set the die on 1 face stead of on a point
+
+                    int choose = rand() % 6; //randomly choose a side to land on
+                    dieRotaions[i][1] = rand() % 366; //rotate y a random amount
+
+                    //each axis rotation is specified and hard coded
+                    if (choose == 0) { //for 1
+                        dieRotaions[i][0] = -90;
+                        dieRotaions[i][1] = 0;
+                        dieRotaions[i][2] = rand() % 366;
+                        //face = 1;
                     }
-                    else {
-                        val = -static_cast <int> (die1Rotation[i]) % 90;
-                        
-                    die1Rotation[i] = static_cast <int> (die1Rotation[i]);
-                    die1Rotation[i] += val;
+                    else if (choose == 1) { //for 2
+                        dieRotaions[i][0] = 90;
+                        dieRotaions[i][1] = 0;
+                        dieRotaions[i][2] = rand() % 366;
+                        //face = 2;
                     }
+                    else if (choose == 2) { //for 3
+                        dieRotaions[i][0] = 180;
+                        dieRotaions[i][2] = 0;
+                        //face = 3;
+                    }
+                    else if (choose == 3) { //for 4
+                        dieRotaions[i][0] = 0;
+                        dieRotaions[i][2] = 0;
+                        //face = 4;
+                    }
+                    else if (choose == 4) { //for 5
+                        dieRotaions[i][0] = 0;
+                        dieRotaions[i][2] = 90;
+                        //face = 5;
+                    }
+                    else if (choose == 5) { //for 6
+                        dieRotaions[i][0] = 0;
+                        dieRotaions[i][2] = -90;
+                        //face = 6;
+                    }
+
+                    //currentScore += face;
+
+                }
+                else
+                {
+                    diebounces[i]++;
+                    dieVelocities[i][1] *= -1;
+                    dieVelocities[i][1] = dieVelocities[i][1] / (diebounces[i]);
+                    diePositions[i][1] = -4.25 + dieVelocities[i][1];
+                    diePositions[i][0] += dieVelocities[i][0] / (diebounces[i]);
+                    diePositions[i][2] += dieVelocities[i][2] / (diebounces[i]);
+                    // give the die random rotaional velocity
+                    generateRandomRotationV(i);
                 }
 
-                //calculate and add points to current player
-                calculatePoints();
             }
-            else
-            {
-                numBounces1++;
-                die1Velocity[1] *= -1;
-                die1Velocity[1] = die1Velocity[1] / (numBounces1);
-                die1Position[1] = -4.25 + die1Velocity[1];
-                die1Position[0] += die1Velocity[0] / (numBounces1);
-                die1Position[2] += die1Velocity[2] / (numBounces1);
-                // give the die random rotaional velocity
-                generateRandomRotationV();
+            else {
+                diePositions[i][0] += dieVelocities[i][0] / (diebounces[i] + 1);
+                diePositions[i][1] += dieVelocities[i][1] / (diebounces[i] + 1);
+                diePositions[i][2] += dieVelocities[i][2] / (diebounces[i] + 1);
+                dieRotaions[i][0] += dieOmegas[i][0];
+                dieRotaions[i][1] += dieOmegas[i][1];
+                dieRotaions[i][2] += dieOmegas[i][2];
+                /*rotmat *= RotateX(die1AngularVelocity[0]);
+                rotmat *= RotateY(die1AngularVelocity[1]);
+                rotmat *= RotateZ(die1AngularVelocity[2]);*/
+
             }
-            
+
         }
-        else {
-            die1Position[0] += die1Velocity[0] / (numBounces1 + 1);
-            die1Position[1] += die1Velocity[1] / (numBounces1 + 1);
-            die1Position[2] += die1Velocity[2] / (numBounces1 + 1);
-            die1Rotation[0] += die1AngularVelocity[0];
-            die1Rotation[1] += die1AngularVelocity[1];
-            die1Rotation[2] += die1AngularVelocity[2];
-            rotmat *= RotateX(die1AngularVelocity[0]);
-            rotmat *= RotateY(die1AngularVelocity[1]);
-            rotmat *= RotateZ(die1AngularVelocity[2]);
-            
-        }
-        
     }
+    
 
     // change the light angle
     if (lightSpin) {
@@ -589,7 +833,6 @@ tick(int n)
     
     // tell GPU to display the frame
     glutPostRedisplay();
-    std::cout << "hello" << std::endl;
 }
 //----------------------------------------------------------------------------
 
@@ -703,7 +946,7 @@ static void
 init()
 {
 
-    srand(time(NULL));
+    
 
     // create the cube object
     colorcube();
@@ -901,14 +1144,14 @@ init()
     // set background color to be white
     glClearColor( 1.0, 1.0, 1.0, 1.0 );
 
-    // initialize game variables
-    playerNum = static_cast <int> (rand());
-    float r1 = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / .1));
-    float r2 = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / .1));
-    float r3 = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / .1));
-    die1Velocity[0] = r1;
-    die1Velocity[1] = r2;
-    die1Velocity[2] = r3;
+    //// initialize game variables
+    //playerNum = static_cast <int> (rand());
+    //float r1 = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / .1));
+    //float r2 = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / .1));
+    //float r3 = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / .1));
+    //dieVelocities[[0] = r1;
+    //die1Velocity[1] = r2;
+    //die1Velocity[2] = r3;
 
 
 
