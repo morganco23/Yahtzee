@@ -88,6 +88,9 @@ static int dieScore[5] = {0,0,0,0,0};
 static int face[5] = {0,0,0,0,0};
 static int locked[13] = {0,0,0,0,0,0,0,0,0,0,0,0,0};
 static int scores[2][13] = {{-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1},{-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1} };
+static int aiRollCount = 0;
+static int aiTimer = 100;
+
 
 static int playerNum = 0; //0 for player, 1 for computer
 static int turn = 0;
@@ -892,7 +895,7 @@ static void
 tick(int n)
 {
     srand(time(NULL));
-
+    
     glutTimerFunc(n, tick, n); // schedule next tick
 
     // change the appropriate axis based on spin-speed
@@ -932,6 +935,9 @@ tick(int n)
             if (diePositions[i][1] <= -4.25) {
                 if (speeds[i] < 0.02 || diebounces[i] > 3) {
                     dieMoving[i] = false;
+                    dieVelocities[i][0] = 0;
+                    dieVelocities[i][1] = 0;
+                    dieVelocities[i][2] = 0;
                     // set the die on 1 face stead of on a point
 
                     int choose = rand() % 6; //randomly choose a side to land on
@@ -1002,6 +1008,41 @@ tick(int n)
         }
     }
     
+    int speedsum = 0;
+    for (int i = 0; i < 5; i++) {
+        speedsum += speeds[i];
+    }
+    std::cout << aiTimer << std::endl;
+    if (turn != 0 && aiRollCount < 3 && speedsum == 0 && aiTimer == 0) {
+
+        //time for the ai to make a move
+        //need to know that we started our turn so we only run it once
+        //then we roll, then save 3 random die, then roll again, then save a random value
+        std::cout << "Ai Rolled" << std::endl;
+        for (int i = 0; i < 5; i++) {
+            if (reroll[i] == 1) {
+                dieMoving[i] = true;
+                diePositions[i][1] = 2;
+                diebounces[i] = 0;
+                generateRandomVelocities(2, i);
+                generateRandomRotationV(i);
+            }
+        }
+        aiRollCount++;
+        
+
+    }
+    else if (speedsum == 0 && aiTimer > 0) {
+        aiTimer -= 1;
+    }
+    else if (aiRollCount > 2){
+        //not the ais turn so we reset ai Roll Count
+        aiRollCount = 0;
+        turn = 1 - turn;
+    }
+    else {
+        aiTimer = 100;
+    }
 
     // change the light angle
     if (lightSpin) {
@@ -1128,7 +1169,7 @@ keyboard( unsigned char key, int x, int y )
                     }
                     scores[0][0] = sum;
                     locked[0] = 1;
-                    //turn = 1 - turn;
+                    turn = 1 - turn;
                 }
                  break;
              }
@@ -1149,7 +1190,7 @@ keyboard( unsigned char key, int x, int y )
                     }
                     scores[0][1] = sum;
                     locked[1] = 1;
-                    //turn = 1 - turn;
+                    turn = 1 - turn;
                 }
                 break;
              }
@@ -1170,7 +1211,7 @@ keyboard( unsigned char key, int x, int y )
                     }
                     scores[0][2] = sum;
                     locked[2] = 1;
-                    //turn = 1 - turn;
+                    turn = 1 - turn;
                 }
                  break;
              }
@@ -1191,7 +1232,7 @@ keyboard( unsigned char key, int x, int y )
                     }
                     scores[0][3] = sum;
                     locked[3] = 1;
-                    //turn = 1 - turn;
+                    turn = 1 - turn;
                 }
                  break;
              }
@@ -1212,7 +1253,7 @@ keyboard( unsigned char key, int x, int y )
                     }
                     scores[0][4] = sum;
                     locked[4] = 1;
-                    //turn = 1 - turn;
+                    turn = 1 - turn;
                 }
                  break;
              }
@@ -1233,7 +1274,7 @@ keyboard( unsigned char key, int x, int y )
                     }
                     scores[0][5] = sum;
                     locked[5] = 1;
-                    //turn = 1 - turn;
+                    turn = 1 - turn;
                 }
                  break;
              }
@@ -1253,7 +1294,7 @@ keyboard( unsigned char key, int x, int y )
                     int num = 0;
                     scores[0][6] = sum;
                     locked[6] = 1;
-                    //turn = 1 - turn;
+                    turn = 1 - turn;
                 }
                  break;
              }
