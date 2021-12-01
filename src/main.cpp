@@ -86,7 +86,10 @@ static float diebounces[5] = { 0,0,0,0,0 };
 static int reroll[5] = {1,1,1,1,1};
 static int dieScore[5] = {0,0,0,0,0};
 static int face[5] = {0,0,0,0,0};
-static int locked[13] = {0,0,0,0,0,0,0,0,0,0,0,0,0};
+static int locked[13] = { 0,0,0,0,0,0,0,0,0,0,0,0,0 };
+// for testing purposes only
+//static int locked[13] = { 1,1,1,1,1,1,1,1,1,1,1,1,1 };
+//
 static int scores[2][13] = {{-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1},{-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1} };
 static int aiRollCount = 0;
 static int aiTimer = 100;
@@ -593,6 +596,63 @@ static void drawScore() {
     }
 
     model_view = mvstack.pop();
+    //draw total score for each player
+
+    int ptotal = 0;
+    for (int i = 0; i < 13; i++) {
+        if (scores[0][i] > 0) {
+            ptotal += scores[0][i];
+        }
+    }
+
+    mvstack.push(model_view);
+    model_view *= Translate(-6, 23, -23.5);
+    std::string valuestr = std::to_string(ptotal);
+    const char* value = &valuestr[0];
+    drawText(value);
+    model_view = mvstack.pop();
+
+    int aitotal = 0;
+    for (int i = 0; i < 13; i++) {
+        if (scores[1][i] > 0) {
+            aitotal += scores[1][i];
+        }
+    }
+
+    mvstack.push(model_view);
+    model_view *= Translate(20, 23, -23.5);
+    std::string valuestr2 = std::to_string(aitotal);
+    const char* value2 = &valuestr2[0];
+    drawText(value2);
+    model_view = mvstack.pop();
+
+    bool finished = true;
+    for (int i = 0; i < 13; i++) {
+        finished = locked[i] == 1;
+    }
+
+    if (finished && turn == 0) {
+        mvstack.push(model_view);
+        model_view *= Scale(5, 5, 5);
+        model_view *= Translate(-2, 3, 1);
+        
+        
+        if (ptotal > aitotal) {
+            //you win
+            model_view *= Translate(-3, 0, 0);
+            drawText("You Win!");
+        }
+        else if (ptotal == aitotal) {
+            //tie
+            drawText("Tie");
+        }
+        else {
+            //ai wins
+            model_view *= Translate(-3.5, 0, 0);
+            drawText("You Lose");
+        }
+        model_view = mvstack.pop();
+    }
 
     /*mvstack.push(model_view);
     const char* txt = "Your score: ";
