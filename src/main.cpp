@@ -12,6 +12,7 @@
 #include "picking.h"
 #include "matStack.h"
 #include "characters.h"
+#include <unistd.h>
 #include <string>
 
 // tick: every 50 milliseconds
@@ -84,14 +85,15 @@ static float diebounces[5] = { 0,0,0,0,0 };
 
 static int reroll[5] = {1,1,1,1,1};
 static int dieScore[5] = {0,0,0,0,0};
+static int face[5] = {0,0,0,0,0};
+static int locked[13] = {0,0,0,0,0,0,0,0,0,0,0,0,0};
+static int scores[2][13] = {{-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1},{-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1} };
 
-
-// Variables used to control the game
-static int scores[2][13] = { {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1},{-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1} };
-static int playerNum;
+static int turn = 0; //0 for player, 1 for computer
 static int runningSum = 0;
 static bool playerWon = false;
 static int whowon = 0;
+static int rollCount = 0;
 //----------------------------------------------------------------------------
 
 static point4 vertices[178] = {
@@ -499,7 +501,7 @@ static void drawScore() {
     drawText(aiScoreCard);
     model_view = mvstack.pop();
     
-    //draw my labels
+    //draw my scores
     mvstack.push(model_view);
     model_view *= Translate(-25, 20, -23.5);
     drawText(oneLabel);
@@ -667,7 +669,8 @@ display( void )
 
 // picking-finished callback: stop rotation if the cube has beenn selected
 void scenePickingFcn(int code) {
-    if (code > 0 && code < 6) { // the cube
+    std::cout << "picking code: " << code << std::endl;
+    if (code >= 0 && code < 6) { // the cube 1-5
         if (!dieMoving[code]) {
             /*
                 dieMoving[code - 1] = true;
@@ -676,11 +679,8 @@ void scenePickingFcn(int code) {
                 generateRandomVelocities(2, code - 1);
                 generateRandomRotationV(code - 1);
              */
-            reroll[code] = 0;
+            reroll[code] = 1 - reroll[code];
         }
-    }
-    else {
-        
     }
 }
 
@@ -693,7 +693,6 @@ mouse( int button, int state, int x, int y ) {
         // perform a "pick", including any associated action
         startPicking(scenePickingFcn, x, y);
     }
-
 }
 
 //----------------------------------------------------------------------------
@@ -769,13 +768,91 @@ calculatePoints() {
 
 }
 
+static bool checkSlot(int slot) {
+    if (locked[slot] == 1) {
+        return false;
+    }
+    
+    if (slot == 1) {
+        bool contains = false;
+        for (int i = 0; i < 5; i++){
+            if (dieScore[i] == 1) {
+                contains = true;
+            }
+        }
+        return contains;
+    }
+    else if (slot == 2){
+        bool contains = false;
+        for (int i = 0; i < 5; i++){
+            if (dieScore[i] == 2) {
+                contains = true;
+            }
+        }
+        return contains;
+    }
+    else if (slot == 3){
+        bool contains = false;
+        for (int i = 0; i < 5; i++){
+            if (dieScore[i] == 3) {
+                contains = true;
+            }
+        }
+        return contains;
+    }
+    else if (slot == 4){
+        bool contains = false;
+        for (int i = 0; i < 5; i++){
+            if (dieScore[i] == 4) {
+                contains = true;
+            }
+        }
+        return contains;
+    }
+    else if (slot == 5){
+        bool contains = false;
+        for (int i = 0; i < 5; i++){
+            if (dieScore[i] == 5) {
+                contains = true;
+            }
+        }
+        return contains;
+    }
+    else if (slot == 6){
+        bool contains = false;
+        for (int i = 0; i < 5; i++){
+            if (dieScore[i] == 6) {
+                contains = true;
+            }
+        }
+        return contains;
+    }
+    else if (slot == 7){
+        int count = 0;
+        for (int i = 0; i < 5; i++) {
+            for (int j = i + 1; j < 5; j++) {
+                if (dieScore[i] == dieScore[j]) {
+                    i = j;
+                    count++;
+                }
+            }
+            if (count >= 3) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    
+    return false;
+}
+
 static bool isWithinRadius(float pos1[3], float pos2[3], float radius) {
     float sum = 0;
     for (int i = 0; i < 3; i++) {
         sum += (pos2[i] - pos1[i]) * (pos2[i] - pos1[i]);
     }
-    float distance = sqrt(sum);
-    return false;
+    return sqrt(sum) < 1;
 }
 
 static void applyCollisions() {
@@ -809,15 +886,6 @@ tick(int n)
             dieVelocities[i][1] + dieVelocities[i][2] * dieVelocities[i][2];
     }
 
-
-    /*if (scores[0] >= 100) {
-        whowon = 0;
-        playerWon = true;
-    }
-    else if (scores[1] >= 100) {
-        whowon = 1;
-        playerWon = true;
-    }*/
     //std::cout << "X Rotation" << die1Rotation[0] << ", Y Rotation: " << die1Rotation[1] << std::endl;
     // update the position of the die by the different velocities
     for (int i = 0; i < 5; i++) {
@@ -886,7 +954,7 @@ tick(int n)
                         //face = 6;
                     }
 
-                    //currentScore += face;
+                    dieScore[i] = choose + 1;
 
                 }
                 else
@@ -940,14 +1008,6 @@ keyboard( unsigned char key, int x, int y )
             // Q: quit the program
             exit(0);
             break;
-        case 'x': case 'X':
-            // X: set rotation on X-axis
-            Axis = 0;
-            break;
-        case 'y': case 'Y':
-            // Y: set rotation on y-axis
-            Axis = 1;
-            break;
         case 'z': case 'Z':
             // Z: set rotation on z-axis
             Axis = 2;
@@ -964,7 +1024,7 @@ keyboard( unsigned char key, int x, int y )
             // - or _: decrease spin-speed
             spinSpeed -= 0.05;
             break;
-        case 'l': case 'L':
+        case 'e': case 'E':
             // L: toggle whether the light is spinning around scene
             lightSpin = !lightSpin;
             break;
@@ -1017,21 +1077,139 @@ keyboard( unsigned char key, int x, int y )
             model_view_start = Translate(-0.1,0,0)*model_view_start;
             break;
         case 'r': case 'R':
-             for (int i = 0; i < 5; i++){
-                 if (reroll[i] == 1) {
-                     dieMoving[i] = true;
-                     diePositions[i][1] = 2;
-                     diebounces[i] = 0;
-                     generateRandomVelocities(2, i);
-                     generateRandomRotationV(i);
+             std::cout << "Reroll button pressed, roll count = " << rollCount << std::endl;
+             if (turn == 0 && rollCount < 2) {
+                 for (int i = 0; i < 5; i++){
+                     if (reroll[i] == 1) {
+                         dieMoving[i] = true;
+                         diePositions[i][1] = 2;
+                         diebounces[i] = 0;
+                         generateRandomVelocities(2, i);
+                         generateRandomRotationV(i);
+                     }
                  }
+                 rollCount++;
              }
-         case 'i': case 'I':
+             break;
+         case 'I':
              std::cout << "die 1: " << diePositions[0][0] << ", " << diePositions[0][1] << ", " << diePositions[0][2] << std::endl;
              std::cout << "die 2: " << diePositions[1][0] << ", " << diePositions[1][1] << ", " << diePositions[1][2] << std::endl;
              std::cout << "die 3: " << diePositions[2][0] << ", "  << diePositions[2][1] << ", "  << diePositions[2][2] << std::endl;
              std::cout << "die 4: " << diePositions[3][0] << ", "  << diePositions[3][1] << ", "  << diePositions[3][2] << std::endl;
              std::cout << "die 5: " << diePositions[4][0] << ", "  << diePositions[4][1] << ", "  << diePositions[4][2] << std::endl;
+             break;
+        
+         case 't':
+             std::cout << "Slot 1 selected" << std::endl;
+             if (checkSlot(1)) {
+                 if (turn == 0 && locked[0] != 1) {
+                    int sum = 0;
+                    for (int i = 0; i < 5; i++) {
+                        if (dieScore[i] == 1) {
+                            sum += dieScore[i];
+                        }
+                    }
+                    scores[0][0] = sum;
+                    locked[0] = 1;
+                    //turn = 1 - turn;
+                }
+                 break;
+             }
+         case 'y':
+             std::cout << "Slot 2 selected" << std::endl;
+             if (checkSlot(2)) {
+                 if (turn == 0 && locked[1] != 1) {
+                    int sum = 0;
+                    for (int i = 0; i < 5; i++) {
+                        if (dieScore[i] == 2) {
+                            sum += dieScore[i];
+                        }
+                    }
+                    scores[0][1] = sum;
+                    locked[1] = 1;
+                    //turn = 1 - turn;
+                }
+                break;
+             }
+         case 'u':
+             std::cout << "Slot 3 selected" << std::endl;
+             if (checkSlot(3)) {
+                 if (turn == 0 && locked[2] != 1) {
+                    int sum = 0;
+                    for (int i = 0; i < 5; i++) {
+                        if (dieScore[i] == 3) {
+                            sum += dieScore[i];
+                        }
+                    }
+                    scores[0][2] = sum;
+                    locked[2] = 1;
+                    //turn = 1 - turn;
+                }
+                 break;
+             }
+         case 'i':
+             std::cout << "Slot 4 selected" << std::endl;
+             if (checkSlot(4)) {
+                 if (turn == 0 && locked[3] != 1) {
+                    int sum = 0;
+                    for (int i = 0; i < 5; i++) {
+                        if (dieScore[i] == 4) {
+                            sum += dieScore[i];
+                        }
+                    }
+                    scores[0][3] = sum;
+                    locked[3] = 1;
+                    //turn = 1 - turn;
+                }
+                 break;
+             }
+         case 'o':
+             std::cout << "Slot 5 selected" << std::endl;
+             if (checkSlot(5)) {
+                 if (turn == 0 && locked[4] != 1) {
+                    int sum = 0;
+                    for (int i = 0; i < 5; i++) {
+                        if (dieScore[i] == 5) {
+                            sum += dieScore[i];
+                        }
+                    }
+                    scores[0][4] = sum;
+                    locked[4] = 1;
+                    //turn = 1 - turn;
+                }
+                 break;
+             }
+         case 'p':
+             std::cout << "Slot 6 selected" << std::endl;
+             if (checkSlot(6)) {
+                 if (turn == 0 && locked[5] != 1) {
+                    int sum = 0;
+                    for (int i = 0; i < 5; i++) {
+                        if (dieScore[i] == 6) {
+                            sum += dieScore[i];
+                        }
+                    }
+                    scores[0][5] = sum;
+                    locked[5] = 1;
+                    //turn = 1 - turn;
+                }
+                 break;
+             }
+         case 'f':
+             std::cout << "Slot 7 selected" << std::endl;
+             if (checkSlot(7)) {
+                 if (turn == 0 && locked[6] != 1) {
+                    int sum = 0;
+                    for (int i = 0; i < 5; i++) {
+                            sum += dieScore[i];
+                    }
+                    int num = 0;
+                    scores[0][5] = sum;
+                    locked[5] = 1;
+                    //turn = 1 - turn;
+                }
+                 break;
+             }
     }
 }
 
@@ -1053,8 +1231,6 @@ reshape( int width, int height )
 static void
 init()
 {
-
-    
 
     // create the cube object
     colorcube();
