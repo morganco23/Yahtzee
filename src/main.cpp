@@ -12,7 +12,7 @@
 #include "picking.h"
 #include "matStack.h"
 #include "characters.h"
-//#include <unistd.h>
+#include <unistd.h>
 #include <string>
 
 // tick: every 50 milliseconds
@@ -89,8 +89,7 @@ static int face[5] = {0,0,0,0,0};
 static int locked[13] = {0,0,0,0,0,0,0,0,0,0,0,0,0};
 static int scores[2][13] = {{-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1},{-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1} };
 
-static int playerNum = 0; //0 for player, 1 for computer
-static int turn = 0;
+static int turn = 0; //0 for player, 1 for computer
 static int runningSum = 0;
 static bool playerWon = false;
 static int whowon = 0;
@@ -785,12 +784,14 @@ calculatePoints() {
 
 }
 
+//----------------------------------------------------------------
+//Check if the slot for scoring is available
 static bool checkSlot(int slot) {
-    if (locked[slot] == 1) {
+    if (locked[slot - 1] == 1) {
         return false;
     }
     
-    if (slot == 1) {
+    if (slot == 1) { //ones
         bool contains = false;
         for (int i = 0; i < 5; i++){
             if (dieScore[i] == 1) {
@@ -799,7 +800,7 @@ static bool checkSlot(int slot) {
         }
         return contains;
     }
-    else if (slot == 2){
+    else if (slot == 2){ //twos
         bool contains = false;
         for (int i = 0; i < 5; i++){
             if (dieScore[i] == 2) {
@@ -808,7 +809,7 @@ static bool checkSlot(int slot) {
         }
         return contains;
     }
-    else if (slot == 3){
+    else if (slot == 3){ //threes
         bool contains = false;
         for (int i = 0; i < 5; i++){
             if (dieScore[i] == 3) {
@@ -817,7 +818,7 @@ static bool checkSlot(int slot) {
         }
         return contains;
     }
-    else if (slot == 4){
+    else if (slot == 4){ //fours
         bool contains = false;
         for (int i = 0; i < 5; i++){
             if (dieScore[i] == 4) {
@@ -826,7 +827,7 @@ static bool checkSlot(int slot) {
         }
         return contains;
     }
-    else if (slot == 5){
+    else if (slot == 5){ //fives
         bool contains = false;
         for (int i = 0; i < 5; i++){
             if (dieScore[i] == 5) {
@@ -835,7 +836,7 @@ static bool checkSlot(int slot) {
         }
         return contains;
     }
-    else if (slot == 6){
+    else if (slot == 6){ //sixes
         bool contains = false;
         for (int i = 0; i < 5; i++){
             if (dieScore[i] == 6) {
@@ -844,12 +845,11 @@ static bool checkSlot(int slot) {
         }
         return contains;
     }
-    else if (slot == 7){
+    else if (slot == 7){ //3 of a kind
         int count = 0;
         for (int i = 0; i < 5; i++) {
-            for (int j = i + 1; j < 5; j++) {
+            for (int j = i = 1; j < 4; j++) {
                 if (dieScore[i] == dieScore[j]) {
-                    i = j;
                     count++;
                 }
             }
@@ -859,8 +859,96 @@ static bool checkSlot(int slot) {
         }
         return false;
     }
-    
-    
+    else if (slot == 8){ //4 of a kind
+        int count = 0;
+        for (int i = 0; i < 5; i++) {
+            for (int j = i + 1; j < 4; j++) {
+                if (dieScore[i] == dieScore[j]) {
+                    count++;
+                }
+            }
+            if (count >= 4) {
+                return true;
+            }
+        }
+        return false;
+    }
+    else if (slot == 9){ //Full house
+        int count = 0;
+        for (int i = 0; i < 5; i++) {
+            for (int j = i + 1; j < 4; j++) {
+                if (dieScore[i] == dieScore[j]) {
+                    count++;
+                }
+            }
+            if (count == 3) {
+                count = 0;
+                for (int j = 0; j < 5; j++) {
+                    for (int k = j + 1; k < 4; k++){
+                        if (dieScore[k] == dieScore[j] && dieScore[i] != dieScore[j]) {
+                            count++;
+                        }
+                    }
+                }
+                if (count == 2) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    else if (slot == 10) { //Small straight
+        int a = dieScore[0];
+        int b = dieScore[1];
+        int c = dieScore[2];
+        int d = dieScore[3];
+        int e = dieScore[4];
+        for (int i = 0; i < 5; i++) {
+            for (int j = i + 1; j < 4; j++) {
+                if (dieScore[i] == dieScore[j]) {
+                    dieScore[i] = 0;
+                }
+            }
+        }
+        int temp[5] = {a, b, c, d, e};
+        std::sort(temp, temp + 5);
+        
+        if (temp[4] > temp[3] && temp[3] > temp[2] && temp[2] > temp[1]) {
+            return true;
+        }
+        if (temp[3] > temp[2] && temp[2] > temp[1] && temp[1] > temp[0]) {
+            return true;
+        }
+    }
+    else if (slot == 11) { //large straight
+        int a = dieScore[0];
+        int b = dieScore[1];
+        int c = dieScore[2];
+        int d = dieScore[3];
+        int e = dieScore[4];
+        int temp[5] = {a, b, c, d, e};
+        std::sort(temp, temp + 5);
+        if (temp[4] > temp[3] && temp[3] > temp[2] && temp[2] > temp[1] && temp[1] > temp[0]) {
+            return true;
+        }
+    }
+    else if (slot == 12){ //Yahtzee!
+        int count = 0;
+        for (int i = 0; i < 5; i++) {
+            for (int j = i + 1; j < 4; j++) {
+                if (dieScore[i] == dieScore[j]) {
+                    count++;
+                }
+            }
+            if (count == 5) {
+                return true;
+            }
+        }
+        return false;
+    }
+    else if (slot == 13){ //bonus
+        return true;
+    }
     return false;
 }
 
@@ -1119,7 +1207,7 @@ keyboard( unsigned char key, int x, int y )
          case 't':
              std::cout << "Slot 1 selected" << std::endl;
              if (checkSlot(1)) {
-                 if (turn == 0 && locked[0] != 1) {
+                 if (turn == 0) {
                     int sum = 0;
                     for (int i = 0; i < 5; i++) {
                         if (dieScore[i] == 1) {
@@ -1130,17 +1218,12 @@ keyboard( unsigned char key, int x, int y )
                     locked[0] = 1;
                     //turn = 1 - turn;
                 }
-                 break;
              }
-             else {
-                 scores[0][1] = 0;
-                 locked[1] = 1;
-                 break;
-             }
+             break;
          case 'y':
              std::cout << "Slot 2 selected" << std::endl;
              if (checkSlot(2)) {
-                 if (turn == 0 && locked[1] != 1) {
+                 if (turn == 0) {
                     int sum = 0;
                     for (int i = 0; i < 5; i++) {
                         if (dieScore[i] == 2) {
@@ -1151,17 +1234,12 @@ keyboard( unsigned char key, int x, int y )
                     locked[1] = 1;
                     //turn = 1 - turn;
                 }
-                break;
              }
-             else {
-                 scores[0][1] = 0;
-                 locked[1] = 1;
-                 break;
-             }
+             break;
          case 'u':
              std::cout << "Slot 3 selected" << std::endl;
              if (checkSlot(3)) {
-                 if (turn == 0 && locked[2] != 1) {
+                 if (turn == 0) {
                     int sum = 0;
                     for (int i = 0; i < 5; i++) {
                         if (dieScore[i] == 3) {
@@ -1172,17 +1250,12 @@ keyboard( unsigned char key, int x, int y )
                     locked[2] = 1;
                     //turn = 1 - turn;
                 }
-                 break;
              }
-             else {
-                 scores[0][2] = 0;
-                 locked[2] = 1;
-                 break;
-             }
+             break;
          case 'i':
              std::cout << "Slot 4 selected" << std::endl;
              if (checkSlot(4)) {
-                 if (turn == 0 && locked[3] != 1) {
+                 if (turn == 0) {
                     int sum = 0;
                     for (int i = 0; i < 5; i++) {
                         if (dieScore[i] == 4) {
@@ -1193,17 +1266,12 @@ keyboard( unsigned char key, int x, int y )
                     locked[3] = 1;
                     //turn = 1 - turn;
                 }
-                 break;
              }
-             else {
-                 scores[0][3] = 0;
-                 locked[3] = 1;
-                 break;
-             }
+             break;
          case 'o':
              std::cout << "Slot 5 selected" << std::endl;
              if (checkSlot(5)) {
-                 if (turn == 0 && locked[4] != 1) {
+                 if (turn == 0) {
                     int sum = 0;
                     for (int i = 0; i < 5; i++) {
                         if (dieScore[i] == 5) {
@@ -1214,17 +1282,12 @@ keyboard( unsigned char key, int x, int y )
                     locked[4] = 1;
                     //turn = 1 - turn;
                 }
-                 break;
              }
-             else {
-                 scores[0][4] = 0;
-                 locked[4] = 1;
-                 break;
-             }
+             break;
          case 'p':
              std::cout << "Slot 6 selected" << std::endl;
              if (checkSlot(6)) {
-                 if (turn == 0 && locked[5] != 1) {
+                 if (turn == 0) {
                     int sum = 0;
                     for (int i = 0; i < 5; i++) {
                         if (dieScore[i] == 6) {
@@ -1235,40 +1298,107 @@ keyboard( unsigned char key, int x, int y )
                     locked[5] = 1;
                     //turn = 1 - turn;
                 }
-                 break;
              }
-             else {
-                 scores[0][5] = 0;
-                 locked[5] = 1;
-                 break;
-             }
+             break;
          case 'f':
              std::cout << "Slot 7 selected" << std::endl;
              if (checkSlot(7)) {
-                 if (turn == 0 && locked[6] != 1) {
+                 if (turn == 0) {
                     int sum = 0;
                     for (int i = 0; i < 5; i++) {
                             sum += dieScore[i];
                     }
-                    int num = 0;
                     scores[0][6] = sum;
                     locked[6] = 1;
                     //turn = 1 - turn;
                 }
-                 break;
              }
-             else {
-                 scores[0][6] = 0;
-                 locked[6] = 1;
-                 break;
-             }
-         /*case 'g':
+             break;
+         case 'g':
+             std::cout << "Slot 8 selected" << std::endl;
              if (checkSlot(8)) {
-                 if (turn == 0 && locked[7] != 1) {
-                     int 
-                 }
-             }*/
-
+                 if (turn == 0) {
+                    int sum = 0;
+                    for (int i = 0; i < 5; i++) {
+                        sum += dieScore[i];
+                    }
+                    scores[0][7] = sum;
+                    locked[7] = 1;
+                    //turn = 1 - turn;
+                }
+             }
+             break;
+         case 'h':
+             std::cout << "Slot 9 selected" << std::endl;
+             if (checkSlot(9)) {
+                 if (turn == 0) {
+                    int sum = 0;
+                    for (int i = 0; i < 5; i++) {
+                        sum += dieScore[i];
+                    }
+                    scores[0][8] = sum;
+                    locked[8] = 1;
+                    //turn = 1 - turn;
+                }
+             }
+             break;
+         case 'j':
+             std::cout << "Slot 10 selected" << std::endl;
+             if (checkSlot(10)) {
+                 if (turn == 0) {
+                    int sum = 0;
+                    for (int i = 0; i < 5; i++) {
+                        sum += dieScore[i];
+                    }
+                    scores[0][9] = sum;
+                    locked[9] = 1;
+                    //turn = 1 - turn;
+                }
+             }
+             break;
+         case 'k':
+             std::cout << "Slot 11 selected" << std::endl;
+             if (checkSlot(11)) {
+                 if (turn == 0) {
+                    int sum = 0;
+                    for (int i = 0; i < 5; i++) {
+                        sum += dieScore[i];
+                    }
+                    scores[0][10] = sum;
+                    locked[10] = 1;
+                    //turn = 1 - turn;
+                }
+             }
+             break;
+             
+         case 'l':
+             std::cout << "Slot 12 selected" << std::endl;
+             if (checkSlot(12)) {
+                 if (turn == 0) {
+                    int sum = 0;
+                    for (int i = 0; i < 5; i++) {
+                        sum += dieScore[i];
+                    }
+                    scores[0][11] = sum;
+                    locked[11] = 1;
+                    //turn = 1 - turn;
+                }
+             }
+             break;
+         case ';':
+             std::cout << "Slot 13 selected" << std::endl;
+             if (checkSlot(13)) {
+                 if (turn == 0) {
+                    int sum = 0;
+                    for (int i = 0; i < 5; i++) {
+                        sum += dieScore[i];
+                    }
+                    scores[0][12] = sum;
+                    locked[12] = 1;
+                    //turn = 1 - turn;
+                }
+             }
+             break;
     }
 }
 
