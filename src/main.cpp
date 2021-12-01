@@ -12,7 +12,9 @@
 #include "picking.h"
 #include "matStack.h"
 #include "characters.h"
+#include <unistd.h>
 #include <string>
+#include <algorithm>
 
 // tick: every 50 milliseconds
 #define TICK_INTERVAL 50
@@ -33,22 +35,22 @@ static color4   colorsAmbient[NumVertices];
 static GLfloat  objShininess[NumVertices];
 
 // defining some colors
-static color4 RED(1.0,0.0,0.0,1.0);
-static color4 GRAY(0.5,0.5,0.5,1.0);
-static color4 BLUE(0,0,1.0,1.0);
-static color4 GREEN(0.0,1.0,0.0,1.0);
-static color4 YELLOW(1.0,1.0,0.0,1.0);
-static color4 WHITE(1.0,1.0,1.0,1.0);
-static color4 CYAN(0.0,1.0,1.0,1.0);
-static color4 BLACK(0.0,0.0,0.0,1.0);
-static color4 BROWN(0.7,0.7,0.7,1.0);
+static color4 RED(1.0, 0.0, 0.0, 1.0);
+static color4 GRAY(0.5, 0.5, 0.5, 1.0);
+static color4 BLUE(0, 0, 1.0, 1.0);
+static color4 GREEN(0.0, 1.0, 0.0, 1.0);
+static color4 YELLOW(1.0, 1.0, 0.0, 1.0);
+static color4 WHITE(1.0, 1.0, 1.0, 1.0);
+static color4 CYAN(0.0, 1.0, 1.0, 1.0);
+static color4 BLACK(0.0, 0.0, 0.0, 1.0);
+static color4 BROWN(0.7, 0.7, 0.7, 1.0);
 
 // Vertices of a unit cube centered at origin, sides aligned with axes
 
 // Array of rotation angles (in degrees) for each coordinate axis;
 // These are used in rotating the cube.
 static int Axis = 0; // 0 => x-rotation, 1=>y, 2=>z, 3=>none
-static GLfloat Theta[] = { 0.0, 0.0, 0.0, 0.0};
+static GLfloat Theta[] = { 0.0, 0.0, 0.0, 0.0 };
 static float spinSpeed = 1;
 
 // Model-view, model-view-start and projection matrices uniform location
@@ -59,7 +61,7 @@ static int charInfo[256][2];
 // The matrix that defines where the camera is. This starts out +3 in the
 // z-direction, but can change based on the user moving the camera with
 // keyboard input
-mat4 model_view_start = LookAt(0,7.75,7.75,0,0,0,0,1,0);
+mat4 model_view_start = LookAt(0, 7.75, 7.75, 0, 0, 0, 0, 1, 0);
 
 static MatrixStack mvstack;
 mat4 model_view;
@@ -82,16 +84,17 @@ static float dieOmegas[5][3] = { {0,0,0} ,{0,0,0} ,{0,0,0} ,{0,0,0} ,{0,0,0} };
 
 static float diebounces[5] = { 0,0,0,0,0 };
 
-static int reroll[5] = {1,1,1,1,1};
-static int dieScore[5] = {0,0,0,0,0};
-
-
-// Variables used to control the game
+static int reroll[5] = { 1,1,1,1,1 };
+static int dieScore[5] = { 0,0,0,0,0 };
+static int face[5] = { 0,0,0,0,0 };
+static int locked[2][13] = { {0,0,0,0,0,0,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0,0,0,0,0,0} };
 static int scores[2][13] = { {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1},{-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1} };
-static int playerNum;
+
+static int turn = 0; //0 for player, 1 for computer
 static int runningSum = 0;
 static bool playerWon = false;
 static int whowon = 0;
+static int rollCount = 0;
 //----------------------------------------------------------------------------
 
 static point4 vertices[178] = {
@@ -301,37 +304,37 @@ static int idxarr[2] = { 1000,NumVertices };
 //     be the same color
 // - shininess: the shininess of the square
 static void
-quad( int a, int b, int c, int d, color4 col, GLfloat shininess)
+quad(int a, int b, int c, int d, color4 col, GLfloat shininess)
 {
     // Initialize temporary vectors along the quad's edge to
     //   compute its face normal
     vec4 u = vertices[b] - vertices[a];
     vec4 v = vertices[c] - vertices[b];
-    
-    vec3 normal = normalize( cross(u, v) );
-    
+
+    vec3 normal = normalize(cross(u, v));
+
     // create the 6 faces, each with appropriate properties ...
-    
+
     normals[Index] = normal; points[Index] = vertices[a]; colorsDiffuse[Index] = col;
     colorsSpecular[Index] = col; colorsAmbient[Index] = col; objShininess[Index] = shininess;
     Index++;
-    
+
     normals[Index] = normal; points[Index] = vertices[b]; colorsDiffuse[Index] = col;
     colorsSpecular[Index] = col; colorsAmbient[Index] = col; objShininess[Index] = shininess;
     Index++;
-    
+
     normals[Index] = normal; points[Index] = vertices[c]; colorsDiffuse[Index] = col;
     colorsSpecular[Index] = col; colorsAmbient[Index] = col; objShininess[Index] = shininess;
     Index++;
-    
+
     normals[Index] = normal; points[Index] = vertices[a]; colorsDiffuse[Index] = col;
     colorsSpecular[Index] = col; colorsAmbient[Index] = col; objShininess[Index] = shininess;
     Index++;
-    
+
     normals[Index] = normal; points[Index] = vertices[c]; colorsDiffuse[Index] = col;
     colorsSpecular[Index] = col; colorsAmbient[Index] = col; objShininess[Index] = shininess;
     Index++;
-    
+
     normals[Index] = normal; points[Index] = vertices[d]; colorsDiffuse[Index] = col;
     colorsSpecular[Index] = col; colorsAmbient[Index] = col; objShininess[Index] = shininess;
     Index++;
@@ -401,7 +404,7 @@ static void colorcube()
 }
 
 //----------------------------------------------------------------------------
- 
+
 //creates the outside box for the die to bounce off of
 static void
 boundingbox() {
@@ -417,17 +420,17 @@ static int lightId;
 
 // send updated light-position information to the GPU
 static void updateLightPosition() {
-    GLfloat lightX = sin(lightAngle*0.023);
-    GLfloat lightY = sin(lightAngle*0.031);
-    GLfloat lightZ = sin(lightAngle*0.037);
-    vec4 pos(lightX,lightY,lightZ,0.0);
-    glUniform4fv( lightId, 1, pos );
-    
+    GLfloat lightX = sin(lightAngle * 0.023);
+    GLfloat lightY = sin(lightAngle * 0.031);
+    GLfloat lightZ = sin(lightAngle * 0.037);
+    vec4 pos(lightX, lightY, lightZ, 0.0);
+    glUniform4fv(lightId, 1, pos);
+
 }
 //----------------------------------------------------------------------------
 
 static void
-generateRandomVelocities(int max,int dieNum) {
+generateRandomVelocities(int max, int dieNum) {
     for (int i = 0; i < 3; i++) {
         if (i != 1) {
             dieVelocities[dieNum][i] = static_cast <float> (rand() % max);
@@ -451,7 +454,7 @@ static void drawBoundingBox() {
 
     glUniformMatrix4fv(ModelView, 1, GL_TRUE, model_view);
 
-    glDrawArrays(GL_TRIANGLES, 792,24);
+    glDrawArrays(GL_TRIANGLES, 792, 24);
     model_view = mvstack.pop();
 }
 
@@ -470,20 +473,20 @@ static void drawScore() {
     const char* yourScoreCard = "Your Total:";
     const char* aiScoreCard = "AI Total:";
 
-    const char* oneLabel = "One";
-    const char* twoLabel = "Two";
-    const char* threeLabel = "Three";
-    const char* fourLabel = "Four";
-    const char* fiveLabel = "Five";
-    const char* sixLabel = "Six";
+    const char* oneLabel = "One(t)";
+    const char* twoLabel = "Two(y)";
+    const char* threeLabel = "Three(u)";
+    const char* fourLabel = "Four(i)";
+    const char* fiveLabel = "Five(o)";
+    const char* sixLabel = "Six(p)";
 
-    const char* tokLabel = "3 of a kind";
-    const char* fokLabel = "4 of a kind";
-    const char* fhLabel = "Full house";
-    const char* ssLabel = "Small straight";
-    const char* lsLabel = "Large straight";
-    const char* yzeLabel = "Yahtzee";
-    const char* bonus = "Bonus";
+    const char* tokLabel = "3 o(f) a kind";
+    const char* fokLabel = "4 of a kind(g)";
+    const char* fhLabel = "Full house(j)";
+    const char* ssLabel = "Small straight(k)";
+    const char* lsLabel = "(L)arge straight";
+    const char* yzeLabel = "Yahtzee(;)";
+    const char* bonus = "Bonus(')";
 
 
     model_view *= Scale(.2, .2, .2);
@@ -498,8 +501,8 @@ static void drawScore() {
     model_view *= Translate(1, 23, -23.5);
     drawText(aiScoreCard);
     model_view = mvstack.pop();
-    
-    //draw my labels
+
+    //draw my scores
     mvstack.push(model_view);
     model_view *= Translate(-25, 20, -23.5);
     drawText(oneLabel);
@@ -562,12 +565,28 @@ static void drawScore() {
     model_view = mvstack.pop();
 
     mvstack.push(model_view);
-    model_view *= Translate(-4, 20, -23.5);
+    model_view *= Translate(-6, 20, -23.5);
     // draw my scores
     for (int i = 0; i < 13; i++) {
-        std::string valuestr = std::to_string(scores[0][i]);
-        const char* value = &valuestr[0];
-        drawText(value);
+        if (scores[0][i] != -1) {
+            std::string valuestr = std::to_string(scores[0][i]);
+            const char* value = &valuestr[0];
+            drawText(value);
+        }
+        model_view *= Translate(0, -3, 0);
+    }
+
+    model_view = mvstack.pop();
+
+    mvstack.push(model_view);
+    model_view *= Translate(20, 20, -23.5);
+    // draw ai scores
+    for (int i = 0; i < 13; i++) {
+        if (scores[1][i] != -1) {
+            std::string valuestr = std::to_string(scores[1][i]);
+            const char* value = &valuestr[0];
+            drawText(value);
+        }
         model_view *= Translate(0, -3, 0);
     }
 
@@ -582,7 +601,7 @@ static void drawScore() {
         model_view *= Translate(1.25, 0, 0);
         glUniformMatrix4fv(ModelView, 1, GL_TRUE, model_view);
         glDrawArrays(GL_TRIANGLES, charInfo[txt[i]][0], charInfo[txt[i]][1]);
-        
+
     }
     std::string myscore = std::to_string(scores[0]);
     for (int i = 0; i < myscore.length(); i++) {
@@ -609,21 +628,21 @@ static void drawScore() {
         glDrawArrays(GL_TRIANGLES, charInfo[aiscore[i]][0], charInfo[aiscore[i]][1]);
 
     }*/
-    
+
     model_view = mvstack.pop();
 }
 
 // display the scene
 static void
-display( void )
+display(void)
 {
-    
+
     // set all to background color
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    
+
     // compute the initial model-view matrix based on camera position
     model_view = model_view_start;
-    
+
 
     mvstack.push(model_view);
 
@@ -648,7 +667,7 @@ display( void )
         clearPickId(); // clear pick-id
         model_view = mvstack.pop();
     }
-    
+
 
     drawBoundingBox();
 
@@ -667,7 +686,8 @@ display( void )
 
 // picking-finished callback: stop rotation if the cube has beenn selected
 void scenePickingFcn(int code) {
-    if (code > 0 && code < 6) { // the cube
+    std::cout << "picking code: " << code << std::endl;
+    if (code >= 0 && code < 6) { // the cube 1-5
         if (!dieMoving[code]) {
             /*
                 dieMoving[code - 1] = true;
@@ -676,11 +696,8 @@ void scenePickingFcn(int code) {
                 generateRandomVelocities(2, code - 1);
                 generateRandomRotationV(code - 1);
              */
-            reroll[code] = 0;
+            reroll[code] = 1 - reroll[code];
         }
-    }
-    else {
-        
     }
 }
 
@@ -688,12 +705,11 @@ void scenePickingFcn(int code) {
 
 // for now, stop the spinning if the cube is clicked
 static void
-mouse( int button, int state, int x, int y ) {
+mouse(int button, int state, int x, int y) {
     if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
         // perform a "pick", including any associated action
         startPicking(scenePickingFcn, x, y);
     }
-
 }
 
 //----------------------------------------------------------------------------
@@ -709,7 +725,7 @@ dotProduct(vec4 v1, vec4 v2) {
 
 static void
 calculatePoints() {
-    vec4 leftnormal = vec4(-1,0,0,0);       // 1
+    vec4 leftnormal = vec4(-1, 0, 0, 0);       // 1
     vec4 rightnormal = vec4(1, 0, 0, 0);    // 6
     vec4 frontnormal = vec4(0, 0, 1, 0);    // 3
     vec4 backnormal = vec4(0, 0, -1, 0);    // 4
@@ -769,15 +785,386 @@ calculatePoints() {
 
 }
 
-static bool isWithinRadius(float pos1[3], float pos2[3], float radius) {
-    float sum = 0;
-    for (int i = 0; i < 3; i++) {
-        sum += (pos2[i] - pos1[i]) * (pos2[i] - pos1[i]);
+//----------------------------------------------------------------
+//Check if the slot for scoring is available
+static bool checkSlot(int slot) {
+    if (locked[turn][slot - 1] == 1) {
+        return false;
     }
-    float distance = sqrt(sum);
+
+    if (slot == 1) { //ones
+        bool contains = false;
+        for (int i = 0; i < 5; i++) {
+            if (dieScore[i] == 1) {
+                contains = true;
+            }
+        }
+        return contains;
+    }
+    else if (slot == 2) { //twos
+        bool contains = false;
+        for (int i = 0; i < 5; i++) {
+            if (dieScore[i] == 2) {
+                contains = true;
+            }
+        }
+        return contains;
+    }
+    else if (slot == 3) { //threes
+        bool contains = false;
+        for (int i = 0; i < 5; i++) {
+            if (dieScore[i] == 3) {
+                contains = true;
+            }
+        }
+        return contains;
+    }
+    else if (slot == 4) { //fours
+        bool contains = false;
+        for (int i = 0; i < 5; i++) {
+            if (dieScore[i] == 4) {
+                contains = true;
+            }
+        }
+        return contains;
+    }
+    else if (slot == 5) { //fives
+        bool contains = false;
+        for (int i = 0; i < 5; i++) {
+            if (dieScore[i] == 5) {
+                contains = true;
+            }
+        }
+        return contains;
+    }
+    else if (slot == 6) { //sixes
+        bool contains = false;
+        for (int i = 0; i < 5; i++) {
+            if (dieScore[i] == 6) {
+                contains = true;
+            }
+        }
+        return contains;
+    }
+    else if (slot == 7) { //3 of a kind
+        int count = 0;
+        for (int i = 0; i < 5; i++) {
+            for (int j = i = 1; j < 4; j++) {
+                if (dieScore[i] == dieScore[j]) {
+                    count++;
+                }
+            }
+            if (count >= 3) {
+                return true;
+            }
+        }
+        return false;
+    }
+    else if (slot == 8) { //4 of a kind
+        int count = 0;
+        for (int i = 0; i < 5; i++) {
+            for (int j = i = 1; j < 4; j++) {
+                if (dieScore[i] == dieScore[j]) {
+                    count++;
+                }
+            }
+            if (count >= 4) {
+                return true;
+            }
+        }
+        return false;
+    }
+    else if (slot == 9) { //Full house
+        int count = 0;
+        for (int i = 0; i < 5; i++) {
+            for (int j = i + 1; j < 4; j++) {
+                if (dieScore[i] == dieScore[j]) {
+                    count++;
+                }
+            }
+            if (count == 3) {
+                count = 0;
+                for (int j = 0; j < 5; j++) {
+                    for (int k = j + 1; k < 4; k++) {
+                        if (dieScore[k] == dieScore[j] && dieScore[i] != dieScore[j]) {
+                            count++;
+                        }
+                    }
+                }
+                if (count == 2) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    else if (slot == 10) { //Small straight
+        int a = dieScore[0];
+        int b = dieScore[1];
+        int c = dieScore[2];
+        int d = dieScore[3];
+        int e = dieScore[4];
+        for (int i = 0; i < 5; i++) {
+            for (int j = i + 1; j < 4; j++) {
+                if (dieScore[i] == dieScore[j]) {
+                    dieScore[i] = 0;
+                }
+            }
+        }
+        int temp[5] = { a, b, c, d, e };
+        std::sort(temp, temp + 5);
+
+        if (temp[4] > temp[3] && temp[3] > temp[2] && temp[2] > temp[1]) {
+            return true;
+        }
+        if (temp[3] > temp[2] && temp[2] > temp[1] && temp[1] > temp[0]) {
+            return true;
+        }
+    }
+    else if (slot == 11) { //large straight
+        int a = dieScore[0];
+        int b = dieScore[1];
+        int c = dieScore[2];
+        int d = dieScore[3];
+        int e = dieScore[4];
+        int temp[5] = { a, b, c, d, e };
+        std::sort(temp, temp + 5);
+        if (temp[4] > temp[3] && temp[3] > temp[2] && temp[2] > temp[1] && temp[1] > temp[0]) {
+            return true;
+        }
+    }
+    else if (slot == 12) { //Yahtzee!
+        int count = 0;
+        for (int i = 0; i < 5; i++) {
+            for (int j = i + 1; j < 4; j++) {
+                if (dieScore[i] == dieScore[j]) {
+                    count++;
+                }
+            }
+            if (count == 5) {
+                return true;
+            }
+        }
+        return false;
+    }
+    else if (slot == 13) { //bonus
+        return true;
+    }
     return false;
 }
 
+//----------------------------------------------------------------
+//Set the score according to the selection of the slot
+static void choose(int slot) {
+    if (locked[turn][0] != 1 && slot == 1) { //ones
+        int sum = 0;
+        for (int i = 0; i < 5; i++) {
+            if (dieScore[i] == 1) {
+                sum += dieScore[i];
+            }
+        }
+        if (checkSlot(1)) { //twos
+            scores[turn][0] = sum;
+        }
+        else {
+            scores[turn][0] = 0;
+        }
+        locked[turn][0] = 1;
+        turn = 1 - turn;
+    }
+    if (locked[turn][1] != 1 && slot == 2) { //threes
+        int sum = 0;
+        for (int i = 0; i < 5; i++) {
+            if (dieScore[i] == 2) {
+                sum += dieScore[i];
+            }
+        }
+        if (checkSlot(2)) {
+            scores[turn][1] = sum;
+        }
+        else {
+            scores[turn][1] = 0;
+        }
+        locked[turn][1] = 1;
+        turn = 1 - turn;
+    }
+    if (locked[turn][2] != 1 && slot == 3) { //fours
+        int sum = 0;
+        for (int i = 0; i < 5; i++) {
+            if (dieScore[i] == 3) {
+                sum += dieScore[i];
+            }
+        }
+        if (checkSlot(3)) {
+            scores[turn][2] = sum;
+        }
+        else {
+            scores[turn][2] = 0;
+        }
+        locked[turn][2] = 1;
+        turn = 1 - turn;
+    }
+    if (locked[turn][3] != 1 && slot == 4) { //fives
+        int sum = 0;
+        for (int i = 0; i < 5; i++) {
+            if (dieScore[i] == 4) {
+                sum += dieScore[i];
+            }
+        }
+        if (checkSlot(4)) {
+            scores[turn][3] = sum;
+        }
+        else {
+            scores[turn][3] = 0;
+        }
+        locked[turn][3] = 1;
+        turn = 1 - turn;
+    }
+    if (locked[turn][4] != 1 && slot == 5) { //sixes
+        int sum = 0;
+        for (int i = 0; i < 5; i++) {
+            if (dieScore[i] == 5) {
+                sum += dieScore[i];
+            }
+        }
+        if (checkSlot(5)) {
+            scores[turn][4] = sum;
+        }
+        else {
+            scores[turn][4] = 0;
+        }
+        locked[turn][4] = 1;
+        turn = 1 - turn;
+    }
+    if (locked[turn][5] != 1 && slot == 6) { //3 of a kind
+        int sum = 0;
+        for (int i = 0; i < 5; i++) {
+            if (dieScore[i] == 6) {
+                sum += dieScore[i];
+            }
+        }
+        if (checkSlot(6)) {
+            scores[turn][5] = sum;
+        }
+        else {
+            scores[turn][5] = 0;
+        }
+        locked[turn][5] = 1;
+        turn = 1 - turn;
+    }
+    if (locked[turn][6] != 1 && slot == 7) { //4 of a kind
+        int sum = 0;
+        for (int i = 0; i < 5; i++) {
+            sum += dieScore[i];
+        }
+        if (checkSlot(7)) {
+            scores[turn][6] = sum;
+        }
+        else {
+            scores[turn][6] = 0;
+        }
+        locked[turn][6] = 1;
+        turn = 1 - turn;
+    }
+    if (locked[turn][7] != 1 && slot == 8) { //full house
+        int sum = 0;
+        for (int i = 0; i < 5; i++) {
+            sum += dieScore[i];
+        }
+        if (checkSlot(8)) {
+            scores[turn][7] = sum;
+        }
+        else {
+            scores[turn][7] = 0;
+        }
+        locked[turn][7] = 1;
+        turn = 1 - turn;
+    }
+    if (locked[turn][8] != 1 && slot == 9) { //small straight
+        int sum = 0;
+        for (int i = 0; i < 5; i++) {
+            sum += dieScore[i];
+        }
+        if (checkSlot(9)) {
+            scores[turn][8] = sum;
+        }
+        else {
+            scores[turn][8] = 0;
+        }
+        locked[turn][8] = 1;
+        turn = 1 - turn;
+    }
+    if (locked[turn][9] != 1 && slot == 10) { //large straight
+        int sum = 0;
+        for (int i = 0; i < 5; i++) {
+            sum += dieScore[i];
+        }
+        if (checkSlot(10)) {
+            scores[turn][9] = sum;
+        }
+        else {
+            scores[turn][9] = 0;
+        }
+        locked[turn][9] = 1;
+        turn = 1 - turn;
+    }
+    if (locked[turn][10] != 1 && slot == 11) { //yahtzee
+        int sum = 0;
+        for (int i = 0; i < 5; i++) {
+            sum += dieScore[i];
+        }
+        if (checkSlot(11)) {
+            scores[turn][10] = sum;
+        }
+        else {
+            scores[turn][10] = 0;
+        }
+        locked[turn][10] = 1;
+        turn = 1 - turn;
+    }
+    if (locked[turn][11] != 1 && slot == 12) { //bonus
+        int sum = 0;
+        for (int i = 0; i < 5; i++) {
+            sum += dieScore[i];
+        }
+        if (checkSlot(12)) {
+            scores[turn][11] = sum;
+        }
+        else {
+            scores[turn][11] = 0;
+        }
+        locked[turn][11] = 1;
+        turn = 1 - turn;
+    }
+    if (locked[turn][12] != 1 && slot == 13) {
+        int sum = 0;
+        for (int i = 0; i < 5; i++) {
+            sum += dieScore[i];
+        }
+        if (checkSlot(13)) {
+            scores[turn][12] = sum;
+        }
+        else {
+            scores[turn][12] = 0;
+        }
+        locked[turn][12] = 1;
+        turn = 1 - turn;
+    }
+    rollCount = 0; //reset roll count for player
+}
+
+//----------------------------------------------------------------
+//Check if two die are close enough to each other for collision
+static bool isWithinRadius(float pos1[3], float pos2[3], float radius) {
+    float sum = 0;
+    for (int i = 0; i < 3; i++) { //calculate distance between die
+        sum += (pos2[i] - pos1[i]) * (pos2[i] - pos1[i]);
+    }
+    return sqrt(sum) < 1;
+}
+
+//----------------------------------------------------------------
+//apply collision physics to each die
 static void applyCollisions() {
     for (int i = 0; i < 5; i++) {
         for (int j = 0; j < 5; j++) {
@@ -793,6 +1180,33 @@ static void applyCollisions() {
     }
 }
 
+//----------------------------------------------------------------
+//Reroll the dice
+static void roll() {
+    for (int i = 0; i < 5; i++) {
+        if (!dieMoving[i] && reroll[i] != 0) {
+            dieMoving[i] = true;
+            diePositions[i][1] = 2;
+            diebounces[i] = 0;
+            generateRandomVelocities(2, i);
+            generateRandomRotationV(i);
+        }
+    }
+}
+
+//----------------------------------------------------------------
+//Run the computer turn
+static void runComputer() {
+    for (int j = 0; j < 13; j++) {
+        if (checkSlot(j + 1)) {
+            std::cout << "Comp chose " << j + 1 << std::endl;
+            choose(j + 1); //choose the first available slot
+            std::cout << "Comp score " << scores[1][j] << std::endl;
+            break;
+        }
+    }
+}
+
 // timer function, called when the timer has ticked
 static void
 tick(int n)
@@ -800,6 +1214,13 @@ tick(int n)
     srand(time(NULL));
 
     glutTimerFunc(n, tick, n); // schedule next tick
+
+    if (turn == 1) { //run the computer turn
+        for (int i = 0; i < 5; i++) {
+            reroll[i] = 1; //unlock all dice to be rolled
+        }
+        roll();
+    }
 
     // change the appropriate axis based on spin-speed
     //Theta[Axis] += spinSpeed;
@@ -809,22 +1230,13 @@ tick(int n)
             dieVelocities[i][1] + dieVelocities[i][2] * dieVelocities[i][2];
     }
 
-
-    /*if (scores[0] >= 100) {
-        whowon = 0;
-        playerWon = true;
-    }
-    else if (scores[1] >= 100) {
-        whowon = 1;
-        playerWon = true;
-    }*/
     //std::cout << "X Rotation" << die1Rotation[0] << ", Y Rotation: " << die1Rotation[1] << std::endl;
     // update the position of the die by the different velocities
     for (int i = 0; i < 5; i++) {
         if (dieMoving[i]) {
-            
+
             applyCollisions();
-            
+
             dieVelocities[i][1] += gravity;
 
             // all of the bouncing off of the wall conditions
@@ -832,13 +1244,13 @@ tick(int n)
                 diePositions[i][0] = diePositions[i][0] + -0.1 * diePositions[i][0];
                 dieVelocities[i][0] = -dieVelocities[i][0];
                 //give random rotaional velocity
-                std::cout << "bounced of the x wall" << std::endl;
+                //std::cout << "bounced of the x wall" << std::endl;
                 generateRandomRotationV(i);
             }
             if (diePositions[i][2] > 3.15 || diePositions[i][2] < -3.15) {
                 diePositions[i][2] = diePositions[i][2] + -0.1 * diePositions[i][2];
                 dieVelocities[i][2] = -dieVelocities[i][2];
-                std::cout << "bounced of the z wall" << std::endl;
+                //std::cout << "bounced of the z wall" << std::endl;
                 //give random rotaional velocity
                 generateRandomRotationV(i);
             }
@@ -847,6 +1259,9 @@ tick(int n)
             if (diePositions[i][1] <= -4.25) {
                 if (speeds[i] < 0.02 || diebounces[i] > 3) {
                     dieMoving[i] = false;
+                    dieVelocities[i][0] = 0;
+                    dieVelocities[i][1] = 0;
+                    dieVelocities[i][2] = 0;
                     // set the die on 1 face stead of on a point
 
                     int choose = rand() % 6; //randomly choose a side to land on
@@ -886,8 +1301,11 @@ tick(int n)
                         //face = 6;
                     }
 
-                    //currentScore += face;
+                    dieScore[i] = choose + 1;
 
+                    if (turn == 1) {
+                        runComputer();
+                    }
                 }
                 else
                 {
@@ -916,13 +1334,13 @@ tick(int n)
             }
         }
     }
-    
+
 
     // change the light angle
     if (lightSpin) {
         lightAngle += 5.0;
     }
-    
+
     // tell GPU to display the frame
     glutPostRedisplay();
 }
@@ -930,108 +1348,152 @@ tick(int n)
 
 // keyboard callback
 static void
-keyboard( unsigned char key, int x, int y )
+keyboard(unsigned char key, int x, int y)
 {
     // Perform the appropriate action, based on the key that was pressed.
     // Default is to stop the cube-rotation
-     switch (key) {
-        
-        case 'q': case 'Q': case 033: // upper/lower Q or escape
-            // Q: quit the program
-            exit(0);
-            break;
-        case 'x': case 'X':
-            // X: set rotation on X-axis
-            Axis = 0;
-            break;
-        case 'y': case 'Y':
-            // Y: set rotation on y-axis
-            Axis = 1;
-            break;
-        case 'z': case 'Z':
-            // Z: set rotation on z-axis
-            Axis = 2;
-            break;
-        default:
-            // default: stop spinning of cube
-            Axis = 3;
-            break;
-        case '+': case '=':
-            // + or =: increase spin-speed
-            spinSpeed += 0.05;
-            break;
-        case '-': case '_':
-            // - or _: decrease spin-speed
-            spinSpeed -= 0.05;
-            break;
-        case 'l': case 'L':
-            // L: toggle whether the light is spinning around scene
-            lightSpin = !lightSpin;
-            break;
-        case 'w':
-            // move forward
-            model_view_start = Translate(0,0,0.1)*model_view_start;
-            break;
-        case 's':
-            // move backward
-            model_view_start = Translate(0,0,-0.1)*model_view_start;
-            break;
-        case 'a':
-            // turn left
-            model_view_start = RotateY(-1.5)*model_view_start;
-            break;
-        case 'd':
-            // turn right
-            model_view_start = RotateY(1.5)*model_view_start;
-            break;
-        case 'W':
-            // turn up
-            model_view_start = RotateX(-1.5)*model_view_start;
-            break;
-        case 'S':
-            // turn down
-            model_view_start = RotateX(1.5)*model_view_start;
-            break;
-        case 'A':
-            // roll left
-            model_view_start = RotateZ(-1.5)*model_view_start;
-            break;
-        case 'D':
-            // roll right
-            model_view_start = RotateZ(1.5)*model_view_start;
-            break;
-        case 'W'-64: // control-w
-            // move up
-            model_view_start = Translate(0,-0.1,0)*model_view_start;
-            break;
-        case 'S'-64: // control-s
-            // move down
-            model_view_start = Translate(0,0.1,0)*model_view_start;
-            break;
-        case 'A'-64: // control-a
-            // move left
-            model_view_start = Translate(0.1,0,0)*model_view_start;
-            break;
-        case 'D'-64: // control-d
-            // move right
-            model_view_start = Translate(-0.1,0,0)*model_view_start;
-            break;
-        case 'r': case 'R':
-             for (int i = 0; i < 5; i++){
-                 if (reroll[i] == 1) {
-                     dieMoving[i] = true;
-                     diePositions[i][1] = 2;
-                     diebounces[i] = 0;
-                     generateRandomVelocities(2, i);
-                     generateRandomRotationV(i);
-                 }
-             }
-         case 'i': case 'I':
-             std::cout << "die 1: " << diePositions[0][0] << ", " << diePositions[0][1] << ", " << diePositions[0][2] << std::endl;
-             std::cout << "die 2: " << diePositions[1][0] << ", " << diePositions[1][1] << ", " << diePositions[1][2] << std::endl;
-             std::cout << "die 3: " << diePositions[2][0] << ", "  << diePositions[2][1] << ", "  << diePositions[2][2] << std::endl;
-             std::cout << "die 4: " << diePositions[3][0] << ", "  << diePositions[3][1] << ", "  << diePositions[3][2] << std::endl;
-             std::cout << "die 5: " << diePositions[4][0] << ", "  << diePositions[4][1] << ", "  << diePositions[4][2] << std::endl;
+    switch (key) {
+
+    case 'q': case 'Q': case 033: // upper/lower Q or escape
+        // Q: quit the program
+        exit(0);
+        break;
+    case 'z': case 'Z':
+        // Z: set rotation on z-axis
+        Axis = 2;
+        break;
+    default:
+        // default: stop spinning of cube
+        Axis = 3;
+        break;
+    case '+': case '=':
+        // + or =: increase spin-speed
+        spinSpeed += 0.05;
+        break;
+    case '-': case '_':
+        // - or _: decrease spin-speed
+        spinSpeed -= 0.05;
+        break;
+    case 'e': case 'E':
+        // L: toggle whether the light is spinning around scene
+        lightSpin = !lightSpin;
+        break;
+    case 'w':
+        // move forward
+        model_view_start = Translate(0, 0, 0.1) * model_view_start;
+        break;
+    case 's':
+        // move backward
+        model_view_start = Translate(0, 0, -0.1) * model_view_start;
+        break;
+    case 'a':
+        // turn left
+        model_view_start = RotateY(-1.5) * model_view_start;
+        break;
+    case 'd':
+        // turn right
+        model_view_start = RotateY(1.5) * model_view_start;
+        break;
+    case 'W':
+        // turn up
+        model_view_start = RotateX(-1.5) * model_view_start;
+        break;
+    case 'S':
+        // turn down
+        model_view_start = RotateX(1.5) * model_view_start;
+        break;
+    case 'A':
+        // roll left
+        model_view_start = RotateZ(-1.5) * model_view_start;
+        break;
+    case 'D':
+        // roll right
+        model_view_start = RotateZ(1.5) * model_view_start;
+        break;
+    case 'W' - 64: // control-w
+        // move up
+        model_view_start = Translate(0, -0.1, 0) * model_view_start;
+        break;
+    case 'S' - 64: // control-s
+        // move down
+        model_view_start = Translate(0, 0.1, 0) * model_view_start;
+        break;
+    case 'A' - 64: // control-a
+        // move left
+        model_view_start = Translate(0.1, 0, 0) * model_view_start;
+        break;
+    case 'D' - 64: // control-d
+        // move right
+        model_view_start = Translate(-0.1, 0, 0) * model_view_start;
+        break;
+    case 'r': case 'R':
+        std::cout << "Reroll button pressed, roll count = " << rollCount << std::endl;
+        if (turn == 0 && rollCount < 3) {
+            roll();
+            rollCount++;
+        }
+        break;
+    case 'I':
+        std::cout << "die 1: " << diePositions[0][0] << ", " << diePositions[0][1] << ", " << diePositions[0][2] << std::endl;
+        std::cout << "die 2: " << diePositions[1][0] << ", " << diePositions[1][1] << ", " << diePositions[1][2] << std::endl;
+        std::cout << "die 3: " << diePositions[2][0] << ", " << diePositions[2][1] << ", " << diePositions[2][2] << std::endl;
+        std::cout << "die 4: " << diePositions[3][0] << ", " << diePositions[3][1] << ", " << diePositions[3][2] << std::endl;
+        std::cout << "die 5: " << diePositions[4][0] << ", " << diePositions[4][1] << ", " << diePositions[4][2] << std::endl;
+        break;
+
+    case 't':
+        std::cout << "Slot 1 selected" << std::endl;
+        choose(1);
+        break;
+    case 'y':
+        std::cout << "Slot 2 selected" << std::endl;
+        choose(2);
+        break;
+    case 'u':
+        std::cout << "Slot 3 selected" << std::endl;
+        choose(3);
+        break;
+    case 'i':
+        std::cout << "Slot 4 selected" << std::endl;
+        choose(4);
+        break;
+    case 'o':
+        std::cout << "Slot 5 selected" << std::endl;
+        choose(5);
+        break;
+    case 'p':
+        std::cout << "Slot 6 selected" << std::endl;
+        choose(6);
+        break;
+    case 'f':
+        std::cout << "Slot 7 selected" << std::endl;
+        choose(7);
+        break;
+    case 'g':
+        std::cout << "Slot 8 selected" << std::endl;
+        choose(8);
+        break;
+    case 'h':
+        std::cout << "Slot 9 selected" << std::endl;
+        choose(9);
+        break;
+    case 'j':
+        std::cout << "Slot 10 selected" << std::endl;
+        choose(10);
+        break;
+    case 'k':
+        std::cout << "Slot 11 selected" << std::endl;
+        choose(11);
+        break;
+
+    case 'l':
+        std::cout << "Slot 12 selected" << std::endl;
+        choose(12);
+        break;
+    case ';':
+        std::cout << "Slot 13 selected" << std::endl;
+        choose(13);
+        break;
     }
 }
 
@@ -1039,22 +1501,20 @@ keyboard( unsigned char key, int x, int y )
 
 // window-reshape callback
 void
-reshape( int width, int height )
+reshape(int width, int height)
 {
-    glViewport( 0, 0, width, height );
-    
-    GLfloat aspect = GLfloat(width)/height;
-    mat4  projection = Perspective( 65.0, aspect, 0.5, 100.0 );
-    
-    glUniformMatrix4fv( Projection, 1, GL_TRUE, projection );
+    glViewport(0, 0, width, height);
+
+    GLfloat aspect = GLfloat(width) / height;
+    mat4  projection = Perspective(65.0, aspect, 0.5, 100.0);
+
+    glUniformMatrix4fv(Projection, 1, GL_TRUE, projection);
 }
 
 // OpenGL initialization
 static void
 init()
 {
-
-    
 
     // create the cube object
     colorcube();
@@ -1079,178 +1539,178 @@ init()
 
     // Create a vertex array object
     GLuint vao;
-    glGenVertexArrays( 1, &vao );
-    glBindVertexArray( vao );
-    
+    glGenVertexArrays(1, &vao);
+    glBindVertexArray(vao);
+
     // Create and initialize a buffer object
     GLuint buffer;
-    glGenBuffers( 1, &buffer );
-    glBindBuffer( GL_ARRAY_BUFFER, buffer );
-    glBufferData( GL_ARRAY_BUFFER,
-                 sizeof(points) + sizeof(normals) + sizeof(colorsDiffuse) +
-                 sizeof(colorsSpecular) + sizeof(colorsAmbient),
-                 NULL, GL_STATIC_DRAW );
-    glBufferSubData( GL_ARRAY_BUFFER, 0, sizeof(points), points );
-    glBufferSubData( GL_ARRAY_BUFFER, sizeof(points),
-                    sizeof(normals), normals );
-    glBufferSubData( GL_ARRAY_BUFFER, sizeof(points) + sizeof(normals),
-                    sizeof(colorsDiffuse), colorsDiffuse );
-    glBufferSubData( GL_ARRAY_BUFFER, sizeof(points) + sizeof(normals) + sizeof(colorsDiffuse),
-                    sizeof(colorsSpecular), colorsSpecular );
-    glBufferSubData( GL_ARRAY_BUFFER,
-                    sizeof(points) + sizeof(normals) + sizeof(colorsDiffuse) + sizeof(colorsSpecular),
-                    sizeof(colorsAmbient), colorsAmbient );
-    glBufferSubData( GL_ARRAY_BUFFER,
-                    sizeof(points) + sizeof(normals) + sizeof(colorsDiffuse) + sizeof(colorsSpecular) + sizeof(colorsAmbient),
-                    sizeof(objShininess), objShininess );
-    
+    glGenBuffers(1, &buffer);
+    glBindBuffer(GL_ARRAY_BUFFER, buffer);
+    glBufferData(GL_ARRAY_BUFFER,
+        sizeof(points) + sizeof(normals) + sizeof(colorsDiffuse) +
+        sizeof(colorsSpecular) + sizeof(colorsAmbient),
+        NULL, GL_STATIC_DRAW);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(points), points);
+    glBufferSubData(GL_ARRAY_BUFFER, sizeof(points),
+        sizeof(normals), normals);
+    glBufferSubData(GL_ARRAY_BUFFER, sizeof(points) + sizeof(normals),
+        sizeof(colorsDiffuse), colorsDiffuse);
+    glBufferSubData(GL_ARRAY_BUFFER, sizeof(points) + sizeof(normals) + sizeof(colorsDiffuse),
+        sizeof(colorsSpecular), colorsSpecular);
+    glBufferSubData(GL_ARRAY_BUFFER,
+        sizeof(points) + sizeof(normals) + sizeof(colorsDiffuse) + sizeof(colorsSpecular),
+        sizeof(colorsAmbient), colorsAmbient);
+    glBufferSubData(GL_ARRAY_BUFFER,
+        sizeof(points) + sizeof(normals) + sizeof(colorsDiffuse) + sizeof(colorsSpecular) + sizeof(colorsAmbient),
+        sizeof(objShininess), objShininess);
+
     // Load shaders and use the resulting shader program
     const GLchar* vShaderCode =
-    // all of our attributes from the arrays uploaded to the GPU
-    "attribute  vec4 vPosition; "
-    "attribute  vec3 vNormal; "
-    "attribute  vec4 vDiffCol; "
-    "attribute  vec4 vSpecCol; "
-    "attribute  vec4 vAmbCol; "
-    "attribute  float vObjShininess; "
-    
-    // uniform variables
-    "uniform mat4 ModelViewStart; "
-    "uniform mat4 ModelView; "
-    "uniform mat4 Projection; "
-    "uniform vec4 LightPosition; "
-    "uniform vec4 LightDiffuse; "
-    "uniform vec4 LightSpecular; "
-    "uniform vec4 LightAmbient; "
-    "uniform vec4 PickColor; "
-    
-    // variables to send on to the fragment shader
-    "varying vec3 N,L, E, H; "
-    "varying vec4 colorAmbient, colorDiffuse, colorSpecular; "
-    "varying float shininess; "
-    
-    // main vertex shader
-    "void main() "
-    "{ "
-    
-    // Transform vertex  position into eye coordinates
-    "vec3 pos = (ModelView * vPosition).xyz; "
-    " "
-    // compute the lighting-vectors
-    "N = normalize( ModelView*vec4(vNormal, 0.0) ).xyz; "
-    "L = normalize( (ModelViewStart*LightPosition).xyz - pos ); "
-    "E = normalize( -pos ); "
-    "H = normalize( L + E ); "
-    
-    // pass on the material-related variables
-    "colorAmbient = vAmbCol; "
-    "colorDiffuse = vDiffCol; "
-    "colorSpecular = vSpecCol; "
-    "shininess = vObjShininess; "
-    
-    // convert the vertex to camera coordinates
-    "gl_Position = Projection * ModelView * vPosition; "
-    "} "
-    ;
+        // all of our attributes from the arrays uploaded to the GPU
+        "attribute  vec4 vPosition; "
+        "attribute  vec3 vNormal; "
+        "attribute  vec4 vDiffCol; "
+        "attribute  vec4 vSpecCol; "
+        "attribute  vec4 vAmbCol; "
+        "attribute  float vObjShininess; "
+
+        // uniform variables
+        "uniform mat4 ModelViewStart; "
+        "uniform mat4 ModelView; "
+        "uniform mat4 Projection; "
+        "uniform vec4 LightPosition; "
+        "uniform vec4 LightDiffuse; "
+        "uniform vec4 LightSpecular; "
+        "uniform vec4 LightAmbient; "
+        "uniform vec4 PickColor; "
+
+        // variables to send on to the fragment shader
+        "varying vec3 N,L, E, H; "
+        "varying vec4 colorAmbient, colorDiffuse, colorSpecular; "
+        "varying float shininess; "
+
+        // main vertex shader
+        "void main() "
+        "{ "
+
+        // Transform vertex  position into eye coordinates
+        "vec3 pos = (ModelView * vPosition).xyz; "
+        " "
+        // compute the lighting-vectors
+        "N = normalize( ModelView*vec4(vNormal, 0.0) ).xyz; "
+        "L = normalize( (ModelViewStart*LightPosition).xyz - pos ); "
+        "E = normalize( -pos ); "
+        "H = normalize( L + E ); "
+
+        // pass on the material-related variables
+        "colorAmbient = vAmbCol; "
+        "colorDiffuse = vDiffCol; "
+        "colorSpecular = vSpecCol; "
+        "shininess = vObjShininess; "
+
+        // convert the vertex to camera coordinates
+        "gl_Position = Projection * ModelView * vPosition; "
+        "} "
+        ;
     const GLchar* fShaderCode =
-    // variables passed from the vertex shader
-    "varying vec3 N,L, E, H; "
-    "varying float shininess; "
-    "varying vec4 colorAmbient, colorDiffuse, colorSpecular; "
-    
-    // uniform variables
-    "uniform vec4 light_ambient, light_diffuse, light_specular; "
-    "uniform float Shininess; "
-    "uniform vec4 PickColor; "
-    
-    // main fragment shader
-    "void main()  "
-    "{  "
-    
-    // if we are picking, use the pick color, ignoring everything else
-    "if (PickColor.a >= 0.0) { "
-    "   gl_FragColor = PickColor; "
-    "   return;"
-    "} "
-    
-    // compute color intensities
-    "vec4 AmbientProduct = light_ambient * colorAmbient; "
-    "vec4 DiffuseProduct = light_diffuse * colorDiffuse; "
-    "vec4 SpecularProduct = light_specular * colorSpecular; "
-    
-    // Compute fragment colors based on illumination equations
-    "vec4 ambient = AmbientProduct; "
-    "float Kd = max( dot(L, N), 0.0 ); "
-    "vec4  diffuse = Kd*DiffuseProduct; "
-    "float Ks = pow( max(dot(N, H), 0.0), shininess ); "
-    "vec4  specular = Ks * SpecularProduct; "
-    "if( dot(L, N) < 0.0 ) { "
-    "  specular = vec4(0.0, 0.0, 0.0, 1.0); } "
-    
-    // add the color components
-    "  gl_FragColor = ambient + specular + diffuse; "
-    "}  "
-    ;
-    
+        // variables passed from the vertex shader
+        "varying vec3 N,L, E, H; "
+        "varying float shininess; "
+        "varying vec4 colorAmbient, colorDiffuse, colorSpecular; "
+
+        // uniform variables
+        "uniform vec4 light_ambient, light_diffuse, light_specular; "
+        "uniform float Shininess; "
+        "uniform vec4 PickColor; "
+
+        // main fragment shader
+        "void main()  "
+        "{  "
+
+        // if we are picking, use the pick color, ignoring everything else
+        "if (PickColor.a >= 0.0) { "
+        "   gl_FragColor = PickColor; "
+        "   return;"
+        "} "
+
+        // compute color intensities
+        "vec4 AmbientProduct = light_ambient * colorAmbient; "
+        "vec4 DiffuseProduct = light_diffuse * colorDiffuse; "
+        "vec4 SpecularProduct = light_specular * colorSpecular; "
+
+        // Compute fragment colors based on illumination equations
+        "vec4 ambient = AmbientProduct; "
+        "float Kd = max( dot(L, N), 0.0 ); "
+        "vec4  diffuse = Kd*DiffuseProduct; "
+        "float Ks = pow( max(dot(N, H), 0.0), shininess ); "
+        "vec4  specular = Ks * SpecularProduct; "
+        "if( dot(L, N) < 0.0 ) { "
+        "  specular = vec4(0.0, 0.0, 0.0, 1.0); } "
+
+        // add the color components
+        "  gl_FragColor = ambient + specular + diffuse; "
+        "}  "
+        ;
+
     // set up the GLSL shaders
     GLuint program = InitShader2(vShaderCode, fShaderCode);
-    
-    glUseProgram( program );
-    
+
+    glUseProgram(program);
+
     // set up vertex arrays
-    GLuint vPosition = glGetAttribLocation( program, "vPosition" );
-    glEnableVertexAttribArray( vPosition );
-    glVertexAttribPointer( vPosition, 4, GL_FLOAT, GL_FALSE, 0,
-                          BUFFER_OFFSET(0) );
-    
-    GLuint vNormal = glGetAttribLocation( program, "vNormal" );
-    glEnableVertexAttribArray( vNormal );
-    glVertexAttribPointer( vNormal, 3, GL_FLOAT, GL_FALSE, 0,
-                          BUFFER_OFFSET(sizeof(points)) );
-    
-    GLuint vDiffCol = glGetAttribLocation( program, "vDiffCol" );
-    glEnableVertexAttribArray( vDiffCol );
-    glVertexAttribPointer( vDiffCol, 4, GL_FLOAT, GL_FALSE, 0,
-                          BUFFER_OFFSET(sizeof(points)+sizeof(normals)) );
-    
-    GLuint vSpecCol = glGetAttribLocation( program, "vSpecCol" );
-    glEnableVertexAttribArray( vSpecCol );
-    glVertexAttribPointer( vSpecCol, 4, GL_FLOAT, GL_FALSE, 0,
-                          BUFFER_OFFSET(sizeof(points)+sizeof(normals)+sizeof(colorsDiffuse)) );
-    
-    GLuint vAmbCol = glGetAttribLocation( program, "vAmbCol" );
-    glEnableVertexAttribArray( vAmbCol );
-    glVertexAttribPointer( vAmbCol, 4, GL_FLOAT, GL_FALSE, 0,
-                          BUFFER_OFFSET(sizeof(points)+sizeof(normals)+sizeof(colorsDiffuse)+sizeof(colorsSpecular)) );
-    
+    GLuint vPosition = glGetAttribLocation(program, "vPosition");
+    glEnableVertexAttribArray(vPosition);
+    glVertexAttribPointer(vPosition, 4, GL_FLOAT, GL_FALSE, 0,
+        BUFFER_OFFSET(0));
+
+    GLuint vNormal = glGetAttribLocation(program, "vNormal");
+    glEnableVertexAttribArray(vNormal);
+    glVertexAttribPointer(vNormal, 3, GL_FLOAT, GL_FALSE, 0,
+        BUFFER_OFFSET(sizeof(points)));
+
+    GLuint vDiffCol = glGetAttribLocation(program, "vDiffCol");
+    glEnableVertexAttribArray(vDiffCol);
+    glVertexAttribPointer(vDiffCol, 4, GL_FLOAT, GL_FALSE, 0,
+        BUFFER_OFFSET(sizeof(points) + sizeof(normals)));
+
+    GLuint vSpecCol = glGetAttribLocation(program, "vSpecCol");
+    glEnableVertexAttribArray(vSpecCol);
+    glVertexAttribPointer(vSpecCol, 4, GL_FLOAT, GL_FALSE, 0,
+        BUFFER_OFFSET(sizeof(points) + sizeof(normals) + sizeof(colorsDiffuse)));
+
+    GLuint vAmbCol = glGetAttribLocation(program, "vAmbCol");
+    glEnableVertexAttribArray(vAmbCol);
+    glVertexAttribPointer(vAmbCol, 4, GL_FLOAT, GL_FALSE, 0,
+        BUFFER_OFFSET(sizeof(points) + sizeof(normals) + sizeof(colorsDiffuse) + sizeof(colorsSpecular)));
+
     // Initialize lighting position and intensities
-    point4 light_position( 1,1,1, 0 );
-    color4 light_ambient( 0,0,0, 1.0 );
-    color4 light_diffuse(1,1,1, 1.0);
-    color4 light_specular( 0.4,0.4,0.4, 1.0 );
-    
-    glUniform4fv( glGetUniformLocation(program, "light_ambient"),
-                 1, light_ambient );
-    glUniform4fv( glGetUniformLocation(program, "light_diffuse"),
-                 1, light_diffuse );
-    glUniform4fv( glGetUniformLocation(program, "light_specular"),
-                 1, light_specular );
-    
+    point4 light_position(1, 1, 1, 0);
+    color4 light_ambient(0, 0, 0, 1.0);
+    color4 light_diffuse(1, 1, 1, 1.0);
+    color4 light_specular(0.4, 0.4, 0.4, 1.0);
+
+    glUniform4fv(glGetUniformLocation(program, "light_ambient"),
+        1, light_ambient);
+    glUniform4fv(glGetUniformLocation(program, "light_diffuse"),
+        1, light_diffuse);
+    glUniform4fv(glGetUniformLocation(program, "light_specular"),
+        1, light_specular);
+
     lightId = glGetUniformLocation(program, "LightPosition");
-    
+
     // initialize picking
     setGpuPickColorId(glGetUniformLocation(program, "PickColor"));
-    
+
     // Retrieve transformation uniform variable locations
-    ModelViewStart = glGetUniformLocation( program, "ModelViewStart" );
-    ModelView = glGetUniformLocation( program, "ModelView" );
-    Projection = glGetUniformLocation( program, "Projection" );
-    
+    ModelViewStart = glGetUniformLocation(program, "ModelViewStart");
+    ModelView = glGetUniformLocation(program, "ModelView");
+    Projection = glGetUniformLocation(program, "Projection");
+
     // enable z-buffer algorithm
-    glEnable( GL_DEPTH_TEST );
-    
+    glEnable(GL_DEPTH_TEST);
+
     // set background color to be white
-    glClearColor( 1.0, 1.0, 1.0, 1.0 );
+    glClearColor(1.0, 1.0, 1.0, 1.0);
 
     //// initialize game variables
     //playerNum = static_cast <int> (rand());
@@ -1268,21 +1728,21 @@ init()
 //----------------------------------------------------------------------------
 
 int
-main( int argc, char **argv )
+main(int argc, char** argv)
 {
     // perform OpenGL initialization
-    glutInit( &argc, argv );
-    glutInitDisplayMode( GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH );
-    glutInitWindowSize( 1280, 720 );
-    glutCreateWindow( "Yahtzee" );
+    glutInit(&argc, argv);
+    glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH);
+    glutInitWindowSize(1280, 720);
+    glutCreateWindow("Yahtzee");
     glewInit();
     init();
-    
+
     // set up callback functions
-    glutDisplayFunc( display );
-    glutKeyboardFunc( keyboard );
-    glutReshapeFunc( reshape );
-    glutMouseFunc( mouse );
+    glutDisplayFunc(display);
+    glutKeyboardFunc(keyboard);
+    glutReshapeFunc(reshape);
+    glutMouseFunc(mouse);
     glutTimerFunc(TICK_INTERVAL, tick, TICK_INTERVAL); // timer callback
 
     // start executing the main loop, waiting for a callback to occur
