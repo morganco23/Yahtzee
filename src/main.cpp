@@ -59,7 +59,7 @@ static int charInfo[256][2];
 // The matrix that defines where the camera is. This starts out +3 in the
 // z-direction, but can change based on the user moving the camera with
 // keyboard input
-mat4 model_view_start = LookAt(0,10,10,0,0,0,0,1,0);
+mat4 model_view_start = LookAt(0,7.75,7.75,0,0,0,0,1,0);
 
 static MatrixStack mvstack;
 mat4 model_view;
@@ -459,39 +459,107 @@ static void drawText(const char* text) {
         glUniformMatrix4fv(ModelView, 1, GL_TRUE, model_view);
         glDrawArrays(GL_TRIANGLES, charInfo[text[i]][0], charInfo[text[i]][1]);
     }
-    mvstack.pop();
+    model_view = mvstack.pop();
 };
 
 static void drawScore() {
     mvstack.push(model_view);
-    const char* yourScoreCard = "Your Score Card:";
-    const char* aiScoreCard = "AI Score Card:";
+    const char* yourScoreCard = "Your Total:";
+    const char* aiScoreCard = "AI Total:";
 
     const char* oneLabel = "One";
     const char* twoLabel = "Two";
     const char* threeLabel = "Three";
     const char* fourLabel = "Four";
     const char* fiveLabel = "Five";
-    const char* sizLabel = "Six";
+    const char* sixLabel = "Six";
 
     const char* tokLabel = "3 of a kind";
     const char* fokLabel = "4 of a kind";
     const char* fhLabel = "Full house";
     const char* ssLabel = "Small straight";
     const char* lsLabel = "Large straight";
-    const char* yzeLabel = "YAHTZEE";
+    const char* yzeLabel = "Yahtzee";
     const char* bonus = "Bonus";
     
 
     model_view *= Scale(.2, .2, .2);
-    model_view *= Translate(-20, 25, -9.999);
+
+    mvstack.push(model_view);
+    model_view *= Translate(-25, 23, -23.5);
     drawText(yourScoreCard);
-    
-
-
     model_view = mvstack.pop();
 
     mvstack.push(model_view);
+    model_view *= Translate(1, 23, -23.5);
+    drawText(aiScoreCard);
+    model_view = mvstack.pop();
+    
+    //draw my scores
+    mvstack.push(model_view);
+    model_view *= Translate(-25, 20, -23.5);
+    drawText(oneLabel);
+    model_view *= Translate(0, -3, 0);
+    drawText(twoLabel);
+    model_view *= Translate(0, -3, 0);
+    drawText(threeLabel);
+    model_view *= Translate(0, -3, 0);
+    drawText(fourLabel);
+    model_view *= Translate(0, -3, 0);
+    drawText(fiveLabel);
+    model_view *= Translate(0, -3, 0);
+    drawText(sixLabel);
+    model_view *= Translate(0, -3, 0);
+    drawText(tokLabel);
+    model_view *= Translate(0, -3, 0);
+    drawText(fokLabel);
+    model_view *= Translate(0, -3, 0);
+    drawText(fhLabel);
+    model_view *= Translate(0, -3, 0);
+    drawText(ssLabel);
+    model_view *= Translate(0, -3, 0);
+    drawText(lsLabel);
+    model_view *= Translate(0, -3, 0);
+    drawText(yzeLabel);
+    model_view *= Translate(0, -3, 0);
+    drawText(bonus);
+    model_view = mvstack.pop();
+
+
+
+    //draw the ai's scores
+    mvstack.push(model_view);
+    model_view *= Translate(1, 20, -23.5);
+    drawText(oneLabel);
+    model_view *= Translate(0, -3, 0);
+    drawText(twoLabel);
+    model_view *= Translate(0, -3, 0);
+    drawText(threeLabel);
+    model_view *= Translate(0, -3, 0);
+    drawText(fourLabel);
+    model_view *= Translate(0, -3, 0);
+    drawText(fiveLabel);
+    model_view *= Translate(0, -3, 0);
+    drawText(sixLabel);
+    model_view *= Translate(0, -3, 0);
+    drawText(tokLabel);
+    model_view *= Translate(0, -3, 0);
+    drawText(fokLabel);
+    model_view *= Translate(0, -3, 0);
+    drawText(fhLabel);
+    model_view *= Translate(0, -3, 0);
+    drawText(ssLabel);
+    model_view *= Translate(0, -3, 0);
+    drawText(lsLabel);
+    model_view *= Translate(0, -3, 0);
+    drawText(yzeLabel);
+    model_view *= Translate(0, -3, 0);
+    drawText(bonus);
+    model_view = mvstack.pop();
+
+    model_view = mvstack.pop();
+
+    /*mvstack.push(model_view);
     const char* txt = "Your score: ";
     const char* enemytxt = "AI score: ";
     model_view *= Translate(-4 , 4, -3);
@@ -526,8 +594,8 @@ static void drawScore() {
         glUniformMatrix4fv(ModelView, 1, GL_TRUE, model_view);
         glDrawArrays(GL_TRIANGLES, charInfo[aiscore[i]][0], charInfo[aiscore[i]][1]);
 
-    }
-    model_view = mvstack.pop();
+    }*/
+    
 
 }
 
@@ -691,16 +759,18 @@ static bool isWithinRadius(float pos1[3], float pos2[3], float radius) {
     for (int i = 0; i < 3; i++) {
         sum += (pos2[i] - pos1[i]) * (pos2[i] - pos1[i]);
     }
-    return sqrt(sum) <= radius;
+    return (sqrt(sum) <= radius);
 }
 
 static void applyCollisions() {
     for (int i = 0; i < 5; i++) {
-        for (int j = i + 1; j < 5; j++) {
-            if (isWithinRadius(diePositions[i], diePositions[j], 1)) {
-                // we are running into another die. we need to move the oppisite way
-                dieVelocities[i][0] = -dieVelocities[i][0];
-                dieVelocities[i][2] = -dieVelocities[i][2];
+        for (int j = 0; j < 5; j++) {
+            if (i != j) {
+                if (isWithinRadius(diePositions[i], diePositions[j], 1)) {
+                    // we are running into another die. we need to move the oppisite way
+                    dieVelocities[i][0] = -dieVelocities[i][0];
+                    dieVelocities[i][2] = -dieVelocities[i][2];
+                }
             }
         }
     }
