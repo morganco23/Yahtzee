@@ -1,10 +1,15 @@
 //
-//  Display a rotating cube with lighting
+//  Yahtzee
+//  by: Connor Morgan and Nathaniel Pon
 //
-//  Light and material properties are sent to the shader as uniform
-//    variables.  Vertex positions and normals are attribute variables.
-//  Shininess comes into play, so the side of a cube will not necessarily
-//    appear as a uniform color.
+//  standard yahtzee rules apply
+//  press r to roll the die
+//  click on the die to lock them
+//  press the letter that corresponds to the entry on
+//      the scorecard you would like to fill out
+//  once everyone has gone the winner will show up on the screen
+//  it is whoever has more points at the end of the game
+//
 
 #include "cs432.h"
 #include "vec.h"
