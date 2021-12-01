@@ -12,7 +12,6 @@
 #include "picking.h"
 #include "matStack.h"
 #include "characters.h"
-#include <unistd.h>
 #include <string>
 #include <algorithm>
 
@@ -92,6 +91,9 @@ static int locked[2][13] = { {0,0,0,0,0,0,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0,0,0,0,
 static int scores[2][13] = { {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1},{-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1} };
 
 static int turn = 0; //0 for player, 1 for computer
+static int aiTimer = 0;
+static bool needToRoll = false;
+static bool haveRolled = false;
 static int runningSum = 0;
 static bool playerWon = false;
 static int whowon = 0;
@@ -483,11 +485,11 @@ static void drawScore() {
 
     const char* tokLabel = "3 o(f) a kind";
     const char* fokLabel = "4 of a kind(g)";
-    const char* fhLabel = "Full house(j)";
-    const char* ssLabel = "Small straight(k)";
-    const char* lsLabel = "(L)arge straight";
-    const char* yzeLabel = "Yahtzee(;)";
-    const char* bonus = "Bonus(')";
+    const char* fhLabel = "Full (h)ouse";
+    const char* ssLabel = "Small straight(j)";
+    const char* lsLabel = "Large straight(k)";
+    const char* yzeLabel = "Yahtzee(l)";
+    const char* bonus = "Bonus(;)";
 
 
     model_view *= Scale(.2, .2, .2);
@@ -537,7 +539,7 @@ static void drawScore() {
 
     //draw the ai's labels
     mvstack.push(model_view);
-    model_view *= Translate(1, 20, -23.5);
+    model_view *= Translate(0, 20, -23.5);
     drawText(oneLabel);
     model_view *= Translate(0, -3, 0);
     drawText(twoLabel);
@@ -566,7 +568,7 @@ static void drawScore() {
     model_view = mvstack.pop();
 
     mvstack.push(model_view);
-    model_view *= Translate(-6, 20, -23.5);
+    model_view *= Translate(-3, 20, -23.5);
     // draw my scores
     for (int i = 0; i < 13; i++) {
         if (scores[0][i] != -1) {
@@ -580,7 +582,7 @@ static void drawScore() {
     model_view = mvstack.pop();
 
     mvstack.push(model_view);
-    model_view *= Translate(20, 20, -23.5);
+    model_view *= Translate(21, 20, -23.5);
     // draw ai scores
     for (int i = 0; i < 13; i++) {
         if (scores[1][i] != -1) {
@@ -624,7 +626,9 @@ static void drawScore() {
 
     bool finished = true;
     for (int i = 0; i < 13; i++) {
-        finished = locked[i] == 1;
+        for(int j = 0; j < 13; j++)
+            if(locked[j][i] != 1)
+                finished = false;
     }
 
     if (finished && turn == 0) {
@@ -649,43 +653,6 @@ static void drawScore() {
         }
         model_view = mvstack.pop();
     }
-
-    /*mvstack.push(model_view);
-    const char* txt = "Your score: ";
-    const char* enemytxt = "AI score: ";
-    model_view *= Translate(-4 , 4, -3);
-    model_view *= Scale(.33, .33, .33);
-    for (int i = 0; i < strlen(txt); i++) {
-        model_view *= Translate(1.25, 0, 0);
-        glUniformMatrix4fv(ModelView, 1, GL_TRUE, model_view);
-        glDrawArrays(GL_TRIANGLES, charInfo[txt[i]][0], charInfo[txt[i]][1]);
-
-    }
-    std::string myscore = std::to_string(scores[0]);
-    for (int i = 0; i < myscore.length(); i++) {
-        model_view *= Translate(1.25, 0, 0);
-        glUniformMatrix4fv(ModelView, 1, GL_TRUE, model_view);
-        glDrawArrays(GL_TRIANGLES, charInfo[myscore[i]][0], charInfo[myscore[i]][1]);
-
-    }
-    model_view = mvstack.pop();
-    mvstack.push(model_view);
-
-    model_view *= Translate(-4, 2, -3);
-    model_view *= Scale(.33, .33, .33);
-    for (int i = 0; i < strlen(enemytxt); i++) {
-        model_view *= Translate(1.25, 0, 0);
-        glUniformMatrix4fv(ModelView, 1, GL_TRUE, model_view);
-        glDrawArrays(GL_TRIANGLES, charInfo[enemytxt[i]][0], charInfo[enemytxt[i]][1]);
-
-    }
-    std::string aiscore = std::to_string(scores[1]);
-    for (int i = 0; i < aiscore.length(); i++) {
-        model_view *= Translate(1.25, 0, 0);
-        glUniformMatrix4fv(ModelView, 1, GL_TRUE, model_view);
-        glDrawArrays(GL_TRIANGLES, charInfo[aiscore[i]][0], charInfo[aiscore[i]][1]);
-
-    }*/
 
     model_view = mvstack.pop();
 }
@@ -770,78 +737,6 @@ mouse(int button, int state, int x, int y) {
     }
 }
 
-//----------------------------------------------------------------------------
-
-static float
-dotProduct(vec4 v1, vec4 v2) {
-    float runningTotal = 0;
-    for (int i = 0; i < 4; i++) {
-        runningTotal += v1[i] * v2[i];
-    }
-    return  runningTotal;
-}
-
-static void
-calculatePoints() {
-    vec4 leftnormal = vec4(-1, 0, 0, 0);       // 1
-    vec4 rightnormal = vec4(1, 0, 0, 0);    // 6
-    vec4 frontnormal = vec4(0, 0, 1, 0);    // 3
-    vec4 backnormal = vec4(0, 0, -1, 0);    // 4
-    vec4 topnormal = vec4(0, 1, 0, 0);      // 2
-    vec4 bottomnormal = vec4(0, -1, 0, 0);  // 5
-
-    vec4 nLeft = rotmat * leftnormal;
-    vec4 nright = rotmat * rightnormal;
-    vec4 nfront = rotmat * frontnormal;
-    vec4 nback = rotmat * backnormal;
-    vec4 ntop = rotmat * topnormal;
-    vec4 nbottom = rotmat * bottomnormal;
-
-    vec4 normals[6] = { nLeft,nright,nfront,nback,ntop,nbottom };
-
-    int largest = -1;
-    float maxVal = 0;
-    for (int i = 0; i < 6; i++) {
-        std::cout << normals[i] << std::endl;
-        if (dotProduct(normals[i], backnormal) > maxVal) {
-            maxVal = dotProduct(normals[i], topnormal);
-            largest = i;
-        }
-    }
-
-    switch (largest)
-    {
-    case 0:
-        std::cout << "1 was the largest" << std::endl;
-        runningSum = 0;
-        //scores[1] += rand() % 10;
-        break;
-    case 1:
-        std::cout << "6 was the largest" << std::endl;
-        runningSum += 6;
-        break;
-    case 2:
-        std::cout << "3 was the largest" << std::endl;
-        runningSum += 3;
-        break;
-    case 3:
-        std::cout << "4 was the largest" << std::endl;
-        runningSum += 4;
-        break;
-    case 4:
-        std::cout << "2 was the largest" << std::endl;
-        runningSum += 2;
-        break;
-    case 5:
-        std::cout << "5 was the largest" << std::endl;
-        runningSum += 5;
-        break;
-    case -1:
-        std::cout << "There was an error" << std::endl;
-        break;
-    }
-
-}
 
 //----------------------------------------------------------------
 //Check if the slot for scoring is available
@@ -1025,6 +920,9 @@ static bool checkSlot(int slot) {
 //----------------------------------------------------------------
 //Set the score according to the selection of the slot
 static void choose(int slot) {
+    if (needToRoll) {
+        return;
+    }
     if (locked[turn][0] != 1 && slot == 1) { //ones
         int sum = 0;
         for (int i = 0; i < 5; i++) {
@@ -1032,7 +930,7 @@ static void choose(int slot) {
                 sum += dieScore[i];
             }
         }
-        if (checkSlot(1)) { //twos
+        if (checkSlot(1)) {
             scores[turn][0] = sum;
         }
         else {
@@ -1041,7 +939,7 @@ static void choose(int slot) {
         locked[turn][0] = 1;
         turn = 1 - turn;
     }
-    if (locked[turn][1] != 1 && slot == 2) { //threes
+    if (locked[turn][1] != 1 && slot == 2) { //twos
         int sum = 0;
         for (int i = 0; i < 5; i++) {
             if (dieScore[i] == 2) {
@@ -1057,7 +955,7 @@ static void choose(int slot) {
         locked[turn][1] = 1;
         turn = 1 - turn;
     }
-    if (locked[turn][2] != 1 && slot == 3) { //fours
+    if (locked[turn][2] != 1 && slot == 3) { //threes
         int sum = 0;
         for (int i = 0; i < 5; i++) {
             if (dieScore[i] == 3) {
@@ -1073,7 +971,7 @@ static void choose(int slot) {
         locked[turn][2] = 1;
         turn = 1 - turn;
     }
-    if (locked[turn][3] != 1 && slot == 4) { //fives
+    if (locked[turn][3] != 1 && slot == 4) { //fours
         int sum = 0;
         for (int i = 0; i < 5; i++) {
             if (dieScore[i] == 4) {
@@ -1089,7 +987,7 @@ static void choose(int slot) {
         locked[turn][3] = 1;
         turn = 1 - turn;
     }
-    if (locked[turn][4] != 1 && slot == 5) { //sixes
+    if (locked[turn][4] != 1 && slot == 5) { //fives
         int sum = 0;
         for (int i = 0; i < 5; i++) {
             if (dieScore[i] == 5) {
@@ -1105,8 +1003,9 @@ static void choose(int slot) {
         locked[turn][4] = 1;
         turn = 1 - turn;
     }
-    if (locked[turn][5] != 1 && slot == 6) { //3 of a kind
+    if (locked[turn][5] != 1 && slot == 6) { //sixes
         int sum = 0;
+        std::cout << "clicked 3 of a kind" << std::endl;
         for (int i = 0; i < 5; i++) {
             if (dieScore[i] == 6) {
                 sum += dieScore[i];
@@ -1121,7 +1020,7 @@ static void choose(int slot) {
         locked[turn][5] = 1;
         turn = 1 - turn;
     }
-    if (locked[turn][6] != 1 && slot == 7) { //4 of a kind
+    if (locked[turn][6] != 1 && slot == 7) { //3 of a kind
         int sum = 0;
         for (int i = 0; i < 5; i++) {
             sum += dieScore[i];
@@ -1135,7 +1034,7 @@ static void choose(int slot) {
         locked[turn][6] = 1;
         turn = 1 - turn;
     }
-    if (locked[turn][7] != 1 && slot == 8) { //full house
+    if (locked[turn][7] != 1 && slot == 8) { //4 of a kind
         int sum = 0;
         for (int i = 0; i < 5; i++) {
             sum += dieScore[i];
@@ -1149,13 +1048,13 @@ static void choose(int slot) {
         locked[turn][7] = 1;
         turn = 1 - turn;
     }
-    if (locked[turn][8] != 1 && slot == 9) { //small straight
+    if (locked[turn][8] != 1 && slot == 9) { //full house
         int sum = 0;
         for (int i = 0; i < 5; i++) {
             sum += dieScore[i];
         }
         if (checkSlot(9)) {
-            scores[turn][8] = sum;
+            scores[turn][8] = 25;
         }
         else {
             scores[turn][8] = 0;
@@ -1163,13 +1062,9 @@ static void choose(int slot) {
         locked[turn][8] = 1;
         turn = 1 - turn;
     }
-    if (locked[turn][9] != 1 && slot == 10) { //large straight
-        int sum = 0;
-        for (int i = 0; i < 5; i++) {
-            sum += dieScore[i];
-        }
+    if (locked[turn][9] != 1 && slot == 10) { //small straight
         if (checkSlot(10)) {
-            scores[turn][9] = sum;
+            scores[turn][9] = 30;
         }
         else {
             scores[turn][9] = 0;
@@ -1177,13 +1072,9 @@ static void choose(int slot) {
         locked[turn][9] = 1;
         turn = 1 - turn;
     }
-    if (locked[turn][10] != 1 && slot == 11) { //yahtzee
-        int sum = 0;
-        for (int i = 0; i < 5; i++) {
-            sum += dieScore[i];
-        }
+    if (locked[turn][10] != 1 && slot == 11) { //large straight
         if (checkSlot(11)) {
-            scores[turn][10] = sum;
+            scores[turn][10] = 40;
         }
         else {
             scores[turn][10] = 0;
@@ -1191,13 +1082,9 @@ static void choose(int slot) {
         locked[turn][10] = 1;
         turn = 1 - turn;
     }
-    if (locked[turn][11] != 1 && slot == 12) { //bonus
-        int sum = 0;
-        for (int i = 0; i < 5; i++) {
-            sum += dieScore[i];
-        }
+    if (locked[turn][11] != 1 && slot == 12) { //yahtzee
         if (checkSlot(12)) {
-            scores[turn][11] = sum;
+            scores[turn][11] = 50;
         }
         else {
             scores[turn][11] = 0;
@@ -1205,7 +1092,7 @@ static void choose(int slot) {
         locked[turn][11] = 1;
         turn = 1 - turn;
     }
-    if (locked[turn][12] != 1 && slot == 13) {
+    if (locked[turn][12] != 1 && slot == 13) { //bonus
         int sum = 0;
         for (int i = 0; i < 5; i++) {
             sum += dieScore[i];
@@ -1261,6 +1148,7 @@ static void roll() {
             generateRandomRotationV(i);
         }
     }
+    needToRoll = false;
 }
 
 //----------------------------------------------------------------
@@ -1284,11 +1172,14 @@ tick(int n)
     
     glutTimerFunc(n, tick, n); // schedule next tick
 
+    if (turn == 0) {
+        haveRolled = false;
+    }
+
     if (turn == 1) { //run the computer turn
         for (int i = 0; i < 5; i++) {
             reroll[i] = 1; //unlock all dice to be rolled
         }
-        roll();
     }
 
     // change the appropriate axis based on spin-speed
@@ -1372,9 +1263,7 @@ tick(int n)
 
                     dieScore[i] = choose + 1;
 
-                    if (turn == 1) {
-                        runComputer();
-                    }
+                    
                 }
                 else
                 {
@@ -1404,10 +1293,39 @@ tick(int n)
         }
     }
 
+    int speedsum = 0;
+    for (int i = 0; i < 5; i++) {
+        speedsum += speeds[i];
+    }
+
+    if (turn == 1 && speedsum == 0 && aiTimer == 0 && !haveRolled) {
+        //time for the ai to make a move
+        //need to know that we started our turn so we only run it once
+        //then we roll, then save 3 random die, then roll again, then save a random value
+        std::cout << "Ai Rolled" << std::endl;
+        roll();
+        haveRolled = true;
+
+    }
+    else if (speedsum == 0 && aiTimer > 0) {
+        aiTimer -= 1;
+    }
+    else if (turn == 1 && speedsum == 0) {
+        //finish the ais turn
+        runComputer();
+        needToRoll = true;
+        //haveRolled = true;
+    }
+    else {
+        aiTimer = 50;
+    }
+
     // change the light angle
     if (lightSpin) {
         lightAngle += 5.0;
     }
+
+
 
     // tell GPU to display the frame
     glutPostRedisplay();
@@ -1567,234 +1485,6 @@ keyboard(unsigned char key, int x, int y)
 }
 
 //----------------------------------------------------------------------------
-
-static void aikeyboard(char key)
-{
-    // Perform the appropriate action, based on the key that was pressed.
-    // Default is to stop the cube-rotation
-    switch (key) {
-
-    case 'r': case 'R':
-        std::cout << "Reroll button pressed, roll count = " << rollCount << std::endl;
-        if (turn == 0 && rollCount < 2) {
-            for (int i = 0; i < 5; i++) {
-                if (reroll[i] == 1) {
-                    dieMoving[i] = true;
-                    diePositions[i][1] = 2;
-                    diebounces[i] = 0;
-                    generateRandomVelocities(2, i);
-                    generateRandomRotationV(i);
-                }
-            }
-            rollCount++;
-        }
-        break;
-    case 'I':
-        std::cout << "die 1: " << diePositions[0][0] << ", " << diePositions[0][1] << ", " << diePositions[0][2] << std::endl;
-        std::cout << "die 2: " << diePositions[1][0] << ", " << diePositions[1][1] << ", " << diePositions[1][2] << std::endl;
-        std::cout << "die 3: " << diePositions[2][0] << ", " << diePositions[2][1] << ", " << diePositions[2][2] << std::endl;
-        std::cout << "die 4: " << diePositions[3][0] << ", " << diePositions[3][1] << ", " << diePositions[3][2] << std::endl;
-        std::cout << "die 5: " << diePositions[4][0] << ", " << diePositions[4][1] << ", " << diePositions[4][2] << std::endl;
-        break;
-
-    case 't':
-        std::cout << "Slot 1 selected" << std::endl;
-        if (checkSlot(1)) {
-            if (turn == 0) {
-                int sum = 0;
-                for (int i = 0; i < 5; i++) {
-                    if (dieScore[i] == 1) {
-                        sum += dieScore[i];
-                    }
-                }
-                scores[0][0] = sum;
-                locked[0] = 1;
-                turn = 1 - turn;
-            }
-        }
-        break;
-    case 'y':
-        std::cout << "Slot 2 selected" << std::endl;
-        if (checkSlot(2)) {
-            if (turn == 0) {
-                int sum = 0;
-                for (int i = 0; i < 5; i++) {
-                    if (dieScore[i] == 2) {
-                        sum += dieScore[i];
-                    }
-                }
-                scores[0][1] = sum;
-                locked[1] = 1;
-                turn = 1 - turn;
-            }
-        }
-        break;
-    case 'u':
-        std::cout << "Slot 3 selected" << std::endl;
-        if (checkSlot(3)) {
-            if (turn == 0) {
-                int sum = 0;
-                for (int i = 0; i < 5; i++) {
-                    if (dieScore[i] == 3) {
-                        sum += dieScore[i];
-                    }
-                }
-                scores[0][2] = sum;
-                locked[2] = 1;
-                turn = 1 - turn;
-            }
-        }
-        break;
-    case 'i':
-        std::cout << "Slot 4 selected" << std::endl;
-        if (checkSlot(4)) {
-            if (turn == 0) {
-                int sum = 0;
-                for (int i = 0; i < 5; i++) {
-                    if (dieScore[i] == 4) {
-                        sum += dieScore[i];
-                    }
-                }
-                scores[0][3] = sum;
-                locked[3] = 1;
-                turn = 1 - turn;
-            }
-        }
-        break;
-    case 'o':
-        std::cout << "Slot 5 selected" << std::endl;
-        if (checkSlot(5)) {
-            if (turn == 0) {
-                int sum = 0;
-                for (int i = 0; i < 5; i++) {
-                    if (dieScore[i] == 5) {
-                        sum += dieScore[i];
-                    }
-                }
-                scores[0][4] = sum;
-                locked[4] = 1;
-                turn = 1 - turn;
-            }
-        }
-        break;
-    case 'p':
-        std::cout << "Slot 6 selected" << std::endl;
-        if (checkSlot(6)) {
-            if (turn == 0) {
-                int sum = 0;
-                for (int i = 0; i < 5; i++) {
-                    if (dieScore[i] == 6) {
-                        sum += dieScore[i];
-                    }
-                }
-                scores[0][5] = sum;
-                locked[5] = 1;
-                turn = 1 - turn;
-            }
-        }
-        break;
-    case 'f':
-        std::cout << "Slot 7 selected" << std::endl;
-        if (checkSlot(7)) {
-            if (turn == 0) {
-                int sum = 0;
-                for (int i = 0; i < 5; i++) {
-                    sum += dieScore[i];
-                }
-                scores[0][6] = sum;
-                locked[6] = 1;
-                turn = 1 - turn;
-            }
-        }
-        break;
-    case 'g':
-        std::cout << "Slot 8 selected" << std::endl;
-        if (checkSlot(8)) {
-            if (turn == 0) {
-                int sum = 0;
-                for (int i = 0; i < 5; i++) {
-                    sum += dieScore[i];
-                }
-                scores[0][7] = sum;
-                locked[7] = 1;
-                turn = 1 - turn;
-            }
-        }
-        break;
-    case 'h':
-        std::cout << "Slot 9 selected" << std::endl;
-        if (checkSlot(9)) {
-            if (turn == 0) {
-                int sum = 0;
-                for (int i = 0; i < 5; i++) {
-                    sum += dieScore[i];
-                }
-                scores[0][8] = sum;
-                locked[8] = 1;
-                turn = 1 - turn;
-            }
-        }
-        break;
-    case 'j':
-        std::cout << "Slot 10 selected" << std::endl;
-        if (checkSlot(10)) {
-            if (turn == 0) {
-                int sum = 0;
-                for (int i = 0; i < 5; i++) {
-                    sum += dieScore[i];
-                }
-                scores[0][9] = sum;
-                locked[9] = 1;
-                turn = 1 - turn;
-            }
-        }
-        break;
-    case 'k':
-        std::cout << "Slot 11 selected" << std::endl;
-        if (checkSlot(11)) {
-            if (turn == 0) {
-                int sum = 0;
-                for (int i = 0; i < 5; i++) {
-                    sum += dieScore[i];
-                }
-                scores[0][10] = sum;
-                locked[10] = 1;
-                turn = 1 - turn;
-            }
-        }
-        break;
-
-    case 'l':
-        std::cout << "Slot 12 selected" << std::endl;
-        if (checkSlot(12)) {
-            if (turn == 0) {
-                int sum = 0;
-                for (int i = 0; i < 5; i++) {
-                    sum += dieScore[i];
-                }
-                scores[0][11] = sum;
-                locked[11] = 1;
-                turn = 1 - turn;
-            }
-        }
-        break;
-    case ';':
-        std::cout << "Slot 13 selected" << std::endl;
-        if (checkSlot(13)) {
-            if (turn == 0) {
-                int sum = 0;
-                for (int i = 0; i < 5; i++) {
-                    sum += dieScore[i];
-                }
-                scores[0][12] = sum;
-                locked[12] = 1;
-                turn = 1 - turn;
-            }
-        }
-        break;
-    }
-    std::cout << "button Pressed" << std::endl;
-}
 
 
 // window-reshape callback
