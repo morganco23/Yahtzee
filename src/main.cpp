@@ -12,7 +12,7 @@
 #include "picking.h"
 #include "matStack.h"
 #include "characters.h"
-#include <unistd.h>
+//#include <unistd.h>
 #include <string>
 
 // tick: every 50 milliseconds
@@ -89,7 +89,8 @@ static int face[5] = {0,0,0,0,0};
 static int locked[13] = {0,0,0,0,0,0,0,0,0,0,0,0,0};
 static int scores[2][13] = {{-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1},{-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1} };
 
-static int turn = 0; //0 for player, 1 for computer
+static int playerNum = 0; //0 for player, 1 for computer
+static int turn = 0;
 static int runningSum = 0;
 static bool playerWon = false;
 static int whowon = 0;
@@ -472,20 +473,20 @@ static void drawScore() {
     const char* yourScoreCard = "Your Total:";
     const char* aiScoreCard = "AI Total:";
 
-    const char* oneLabel = "One";
-    const char* twoLabel = "Two";
-    const char* threeLabel = "Three";
-    const char* fourLabel = "Four";
-    const char* fiveLabel = "Five";
-    const char* sixLabel = "Six";
+    const char* oneLabel = "One(t)";
+    const char* twoLabel = "Two(y)";
+    const char* threeLabel = "Three(u)";
+    const char* fourLabel = "Four(i)";
+    const char* fiveLabel = "Five(o)";
+    const char* sixLabel = "Six(p)";
 
-    const char* tokLabel = "3 of a kind";
-    const char* fokLabel = "4 of a kind";
-    const char* fhLabel = "Full house";
-    const char* ssLabel = "Small straight";
-    const char* lsLabel = "Large straight";
-    const char* yzeLabel = "Yahtzee";
-    const char* bonus = "Bonus";
+    const char* tokLabel = "3 o(f) a kind";
+    const char* fokLabel = "4 of a kind(g)";
+    const char* fhLabel = "Full house(j)";
+    const char* ssLabel = "Small straight(k)";
+    const char* lsLabel = "(L)arge straight";
+    const char* yzeLabel = "Yahtzee(;)";
+    const char* bonus = "Bonus(')";
 
 
     model_view *= Scale(.2, .2, .2);
@@ -567,9 +568,11 @@ static void drawScore() {
     model_view *= Translate(-6, 20, -23.5);
     // draw my scores
     for (int i = 0; i < 13; i++) {
-        std::string valuestr = std::to_string(scores[0][i]);
-        const char* value = &valuestr[0];
-        drawText(value);
+        if (scores[0][i] != -1) {
+            std::string valuestr = std::to_string(scores[0][i]);
+            const char* value = &valuestr[0];
+            drawText(value);
+        }
         model_view *= Translate(0, -3, 0);
     }
 
@@ -579,9 +582,11 @@ static void drawScore() {
     model_view *= Translate(20, 20, -23.5);
     // draw ai scores
     for (int i = 0; i < 13; i++) {
-        std::string valuestr = std::to_string(scores[1][i]);
-        const char* value = &valuestr[0];
-        drawText(value);
+        if (scores[1][i] != -1) {
+            std::string valuestr = std::to_string(scores[1][i]);
+            const char* value = &valuestr[0];
+            drawText(value);
+        }
         model_view *= Translate(0, -3, 0);
     }
 
@@ -1127,6 +1132,11 @@ keyboard( unsigned char key, int x, int y )
                 }
                  break;
              }
+             else {
+                 scores[0][1] = 0;
+                 locked[1] = 1;
+                 break;
+             }
          case 'y':
              std::cout << "Slot 2 selected" << std::endl;
              if (checkSlot(2)) {
@@ -1143,6 +1153,11 @@ keyboard( unsigned char key, int x, int y )
                 }
                 break;
              }
+             else {
+                 scores[0][1] = 0;
+                 locked[1] = 1;
+                 break;
+             }
          case 'u':
              std::cout << "Slot 3 selected" << std::endl;
              if (checkSlot(3)) {
@@ -1157,6 +1172,11 @@ keyboard( unsigned char key, int x, int y )
                     locked[2] = 1;
                     //turn = 1 - turn;
                 }
+                 break;
+             }
+             else {
+                 scores[0][2] = 0;
+                 locked[2] = 1;
                  break;
              }
          case 'i':
@@ -1175,6 +1195,11 @@ keyboard( unsigned char key, int x, int y )
                 }
                  break;
              }
+             else {
+                 scores[0][3] = 0;
+                 locked[3] = 1;
+                 break;
+             }
          case 'o':
              std::cout << "Slot 5 selected" << std::endl;
              if (checkSlot(5)) {
@@ -1189,6 +1214,11 @@ keyboard( unsigned char key, int x, int y )
                     locked[4] = 1;
                     //turn = 1 - turn;
                 }
+                 break;
+             }
+             else {
+                 scores[0][4] = 0;
+                 locked[4] = 1;
                  break;
              }
          case 'p':
@@ -1207,6 +1237,11 @@ keyboard( unsigned char key, int x, int y )
                 }
                  break;
              }
+             else {
+                 scores[0][5] = 0;
+                 locked[5] = 1;
+                 break;
+             }
          case 'f':
              std::cout << "Slot 7 selected" << std::endl;
              if (checkSlot(7)) {
@@ -1216,12 +1251,24 @@ keyboard( unsigned char key, int x, int y )
                             sum += dieScore[i];
                     }
                     int num = 0;
-                    scores[0][5] = sum;
-                    locked[5] = 1;
+                    scores[0][6] = sum;
+                    locked[6] = 1;
                     //turn = 1 - turn;
                 }
                  break;
              }
+             else {
+                 scores[0][6] = 0;
+                 locked[6] = 1;
+                 break;
+             }
+         /*case 'g':
+             if (checkSlot(8)) {
+                 if (turn == 0 && locked[7] != 1) {
+                     int 
+                 }
+             }*/
+
     }
 }
 
