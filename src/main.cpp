@@ -82,6 +82,9 @@ static float dieOmegas[5][3] = { {0,0,0} ,{0,0,0} ,{0,0,0} ,{0,0,0} ,{0,0,0} };
 
 static float diebounces[5] = { 0,0,0,0,0 };
 
+static int reroll[5] = {1,1,1,1,1};
+static int dieScore[5] = {0,0,0,0,0};
+
 
 // Variables used to control the game
 static int scores[2] = { 0,0 };
@@ -301,12 +304,12 @@ static void
 quad( int a, int b, int c, int d, color4 col, GLfloat shininess)
 {
     // Initialize temporary vectors along the quad's edge to
-    //   compute its face normal 
+    //   compute its face normal
     vec4 u = vertices[b] - vertices[a];
     vec4 v = vertices[c] - vertices[b];
-	
+    
     vec3 normal = normalize( cross(u, v) );
-	
+    
     // create the 6 faces, each with appropriate properties ...
     
     normals[Index] = normal; points[Index] = vertices[a]; colorsDiffuse[Index] = col;
@@ -340,7 +343,7 @@ static void
 invquad(int a, int b, int c, int d, color4 col, GLfloat shininess)
 {
     // Initialize temporary vectors along the quad's edge to
-    //   compute its face normal 
+    //   compute its face normal
     vec4 u = vertices[b] - vertices[a];
     vec4 v = vertices[c] - vertices[b];
 
@@ -481,12 +484,13 @@ static void drawScore() {
     const char* lsLabel = "Large straight";
     const char* yzeLabel = "Yahtzee";
     const char* bonus = "Bonus";
-    
+
 
     model_view *= Scale(.2, .2, .2);
 
     mvstack.push(model_view);
     model_view *= Translate(-25, 23, -23.5);
+
     drawText(yourScoreCard);
     model_view = mvstack.pop();
 
@@ -606,7 +610,7 @@ display( void )
     
     // set all to background color
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	
+    
     // compute the initial model-view matrix based on camera position
     model_view = model_view_start;
     
@@ -629,7 +633,7 @@ display( void )
         glUniformMatrix4fv(ModelView, 1, GL_TRUE, model_view);
 
         // emit the cube to the scene
-        setPickId(i + 1); // set pick-id, in case we're picking
+        setPickId(i); // set pick-id, in case we're picking
         glDrawArrays(GL_TRIANGLES, 0, 800);
         clearPickId(); // clear pick-id
         model_view = mvstack.pop();
@@ -654,12 +658,15 @@ display( void )
 // picking-finished callback: stop rotation if the cube has beenn selected
 void scenePickingFcn(int code) {
     if (code > 0 && code < 6) { // the cube
-        if (!dieMoving[code - 1]) {
-            dieMoving[code - 1] = true;
-            diePositions[code - 1][1] = 2;
-            diebounces[code - 1] = 0;
-            generateRandomVelocities(2, code - 1);
-            generateRandomRotationV(code - 1);
+        if (!dieMoving[code]) {
+            /*
+                dieMoving[code - 1] = true;
+                diePositions[code - 1][1] = 2;
+                diebounces[code - 1] = 0;
+                generateRandomVelocities(2, code - 1);
+                generateRandomRotationV(code - 1);
+             */
+            reroll[code] = 0;
         }
     }
     else {
@@ -759,19 +766,21 @@ static bool isWithinRadius(float pos1[3], float pos2[3], float radius) {
     for (int i = 0; i < 3; i++) {
         sum += (pos2[i] - pos1[i]) * (pos2[i] - pos1[i]);
     }
-    return (sqrt(sum) <= radius);
+    float distance = sqrt(sum);
+    return false;
 }
 
 static void applyCollisions() {
     for (int i = 0; i < 5; i++) {
         for (int j = 0; j < 5; j++) {
-            if (i != j) {
+            if (j != i) {
                 if (isWithinRadius(diePositions[i], diePositions[j], 1)) {
                     // we are running into another die. we need to move the oppisite way
                     dieVelocities[i][0] = -dieVelocities[i][0];
                     dieVelocities[i][2] = -dieVelocities[i][2];
                 }
             }
+
         }
     }
 }
@@ -805,23 +814,26 @@ tick(int n)
     // update the position of the die by the different velocities
     for (int i = 0; i < 5; i++) {
         if (dieMoving[i]) {
+            
+            applyCollisions();
+            
             dieVelocities[i][1] += gravity;
 
             // all of the bouncing off of the wall conditions
-            if (diePositions[i][0] > 3.75 || diePositions[i][0] < -3.75) {
+            if (diePositions[i][0] > 3.55 || diePositions[i][0] < -3.55) {
+                diePositions[i][0] = diePositions[i][0] + -0.1 * diePositions[i][0];
                 dieVelocities[i][0] = -dieVelocities[i][0];
                 //give random rotaional velocity
                 std::cout << "bounced of the x wall" << std::endl;
                 generateRandomRotationV(i);
             }
-            if (diePositions[i][2] > 3.75 || diePositions[i][2] < -3.75) {
+            if (diePositions[i][2] > 3.15 || diePositions[i][2] < -3.15) {
+                diePositions[i][2] = diePositions[i][2] + -0.1 * diePositions[i][2];
                 dieVelocities[i][2] = -dieVelocities[i][2];
                 std::cout << "bounced of the z wall" << std::endl;
                 //give random rotaional velocity
                 generateRandomRotationV(i);
             }
-
-            applyCollisions();
 
             //we hit the ground. lets bounce
             if (diePositions[i][1] <= -4.25) {
@@ -894,7 +906,6 @@ tick(int n)
                 rotmat *= RotateZ(die1AngularVelocity[2]);*/
 
             }
-
         }
     }
     
@@ -915,36 +926,36 @@ keyboard( unsigned char key, int x, int y )
 {
     // Perform the appropriate action, based on the key that was pressed.
     // Default is to stop the cube-rotation
- 	switch (key) {
+     switch (key) {
         
-		case 'q': case 'Q': case 033: // upper/lower Q or escape
+        case 'q': case 'Q': case 033: // upper/lower Q or escape
             // Q: quit the program
-			exit(0);
-			break;
+            exit(0);
+            break;
         case 'x': case 'X':
             // X: set rotation on X-axis
-			Axis = 0;
-			break;
-		case 'y': case 'Y':
+            Axis = 0;
+            break;
+        case 'y': case 'Y':
             // Y: set rotation on y-axis
-			Axis = 1;
-			break;
-		case 'z': case 'Z':
+            Axis = 1;
+            break;
+        case 'z': case 'Z':
             // Z: set rotation on z-axis
-			Axis = 2;
-			break;
+            Axis = 2;
+            break;
         default:
             // default: stop spinning of cube
             Axis = 3;
             break;
-		case '+': case '=':
+        case '+': case '=':
             // + or =: increase spin-speed
-			spinSpeed += 0.05;
-			break;
-		case '-': case '_':
+            spinSpeed += 0.05;
+            break;
+        case '-': case '_':
             // - or _: decrease spin-speed
-			spinSpeed -= 0.05;
-			break;
+            spinSpeed -= 0.05;
+            break;
         case 'l': case 'L':
             // L: toggle whether the light is spinning around scene
             lightSpin = !lightSpin;
@@ -997,6 +1008,22 @@ keyboard( unsigned char key, int x, int y )
             // move right
             model_view_start = Translate(-0.1,0,0)*model_view_start;
             break;
+        case 'r': case 'R':
+             for (int i = 1; i < 5; i++){
+                 if (reroll[i] == 1) {
+                     dieMoving[i] = true;
+                     diePositions[i][1] = 2;
+                     diebounces[i] = 0;
+                     generateRandomVelocities(2, i);
+                     generateRandomRotationV(i);
+                 }
+             }
+         case 'i': case 'I':
+             std::cout << "die 1: " << diePositions[0][0] << ", " << diePositions[0][1] << ", " << diePositions[0][2] << std::endl;
+             std::cout << "die 2: " << diePositions[1][0] << ", " << diePositions[1][1] << ", " << diePositions[1][2] << std::endl;
+             std::cout << "die 3: " << diePositions[2][0] << ", "  << diePositions[2][1] << ", "  << diePositions[2][2] << std::endl;
+             std::cout << "die 4: " << diePositions[3][0] << ", "  << diePositions[3][1] << ", "  << diePositions[3][2] << std::endl;
+             std::cout << "die 5: " << diePositions[4][0] << ", "  << diePositions[4][1] << ", "  << diePositions[4][2] << std::endl;
     }
 }
 
@@ -1007,10 +1034,10 @@ void
 reshape( int width, int height )
 {
     glViewport( 0, 0, width, height );
-	
+    
     GLfloat aspect = GLfloat(width)/height;
     mat4  projection = Perspective( 65.0, aspect, 0.5, 100.0 );
-	
+    
     glUniformMatrix4fv( Projection, 1, GL_TRUE, projection );
 }
 
@@ -1238,11 +1265,11 @@ main( int argc, char **argv )
     // perform OpenGL initialization
     glutInit( &argc, argv );
     glutInitDisplayMode( GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH );
-    glutInitWindowSize( 1280, 720 );
-    glutCreateWindow( "Yahtzee" );
-	glewInit();
+    glutInitWindowSize( 512, 512 );
+    glutCreateWindow( "Pig" );
+    glewInit();
     init();
-	
+    
     // set up callback functions
     glutDisplayFunc( display );
     glutKeyboardFunc( keyboard );
