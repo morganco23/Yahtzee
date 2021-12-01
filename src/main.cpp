@@ -426,7 +426,7 @@ static void updateLightPosition() {
 static void
 generateRandomVelocities(int max,int dieNum) {
     for (int i = 0; i < 3; i++) {
-        if (i != 2) {
+        if (i != 1) {
             dieVelocities[dieNum][i] = static_cast <float> (rand() % max);
             //std::cout << "set random velocity " << i << " to " << die1Velocity[i] << std::endl;
         }
@@ -558,13 +558,11 @@ display( void )
         glUniformMatrix4fv(ModelView, 1, GL_TRUE, model_view);
 
         // emit the cube to the scene
-        setPickId(1); // set pick-id, in case we're picking
+        setPickId(i + 1); // set pick-id, in case we're picking
         glDrawArrays(GL_TRIANGLES, 0, 800);
         clearPickId(); // clear pick-id
         model_view = mvstack.pop();
     }
-    
-    
     
 
     drawBoundingBox();
@@ -584,13 +582,13 @@ display( void )
 
 // picking-finished callback: stop rotation if the cube has beenn selected
 void scenePickingFcn(int code) {
-    if (code == 1) { // the cube
+    if (code > 0 && code < 6) { // the cube
         if (!dieMoving[code - 1]) {
             dieMoving[code - 1] = true;
             diePositions[code - 1][1] = 2;
             diebounces[code - 1] = 0;
-            generateRandomVelocities(2,0);
-            generateRandomRotationV(0);
+            generateRandomVelocities(2, code - 1);
+            generateRandomRotationV(code - 1);
         }
     }
     else {
@@ -697,7 +695,9 @@ static void applyCollisions() {
     for (int i = 0; i < 5; i++) {
         for (int j = i + 1; j < 5; j++) {
             if (isWithinRadius(diePositions[i], diePositions[j], 1)) {
-                std::cout << "colliding" << std::endl;
+                // we are running into another die. we need to move the oppisite way
+                dieVelocities[i][0] = -dieVelocities[i][0];
+                dieVelocities[i][2] = -dieVelocities[i][2];
             }
         }
     }
@@ -736,13 +736,13 @@ tick(int n)
 
             // all of the bouncing off of the wall conditions
             if (diePositions[i][0] > 3.75 || diePositions[i][0] < -3.75) {
-                diePositions[i][0] = -dieVelocities[i][0];
+                dieVelocities[i][0] = -dieVelocities[i][0];
                 //give random rotaional velocity
                 std::cout << "bounced of the x wall" << std::endl;
                 generateRandomRotationV(i);
             }
             if (diePositions[i][2] > 3.75 || diePositions[i][2] < -3.75) {
-                diePositions[i][2] = -dieVelocities[i][2];
+                dieVelocities[i][2] = -dieVelocities[i][2];
                 std::cout << "bounced of the z wall" << std::endl;
                 //give random rotaional velocity
                 generateRandomRotationV(i);
