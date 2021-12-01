@@ -87,7 +87,7 @@ static int dieScore[5] = {0,0,0,0,0};
 
 
 // Variables used to control the game
-static int scores[2] = { 0,0 };
+static int scores[2][13] = { {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1},{-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1} };
 static int playerNum;
 static int runningSum = 0;
 static bool playerWon = false;
@@ -499,7 +499,7 @@ static void drawScore() {
     drawText(aiScoreCard);
     model_view = mvstack.pop();
     
-    //draw my scores
+    //draw my labels
     mvstack.push(model_view);
     model_view *= Translate(-25, 20, -23.5);
     drawText(oneLabel);
@@ -531,7 +531,7 @@ static void drawScore() {
 
 
 
-    //draw the ai's scores
+    //draw the ai's labels
     mvstack.push(model_view);
     model_view *= Translate(1, 20, -23.5);
     drawText(oneLabel);
@@ -560,6 +560,16 @@ static void drawScore() {
     model_view *= Translate(0, -3, 0);
     drawText(bonus);
     model_view = mvstack.pop();
+
+    mvstack.push(model_view);
+    model_view *= Translate(-4, 20, -23.5);
+    // draw my scores
+    for (int i = 0; i < 13; i++) {
+        std::string valuestr = std::to_string(scores[0][i]);
+        const char* value = &valuestr[0];
+        drawText(value);
+        model_view *= Translate(0, -3, 0);
+    }
 
     model_view = mvstack.pop();
 
@@ -600,7 +610,7 @@ static void drawScore() {
 
     }*/
     
-
+    model_view = mvstack.pop();
 }
 
 // display the scene
@@ -670,9 +680,7 @@ void scenePickingFcn(int code) {
         }
     }
     else {
-        scores[0] += runningSum;
-        runningSum = 0;
-        scores[1] += rand() % 10;
+        
     }
 }
 
@@ -732,7 +740,7 @@ calculatePoints() {
     case 0:
         std::cout << "1 was the largest" << std::endl;
         runningSum = 0;
-        scores[1] += rand() % 10;
+        //scores[1] += rand() % 10;
         break;
     case 1:
         std::cout << "6 was the largest" << std::endl;
@@ -802,14 +810,14 @@ tick(int n)
     }
 
 
-    if (scores[0] >= 100) {
+    /*if (scores[0] >= 100) {
         whowon = 0;
         playerWon = true;
     }
     else if (scores[1] >= 100) {
         whowon = 1;
         playerWon = true;
-    }
+    }*/
     //std::cout << "X Rotation" << die1Rotation[0] << ", Y Rotation: " << die1Rotation[1] << std::endl;
     // update the position of the die by the different velocities
     for (int i = 0; i < 5; i++) {
@@ -1009,7 +1017,7 @@ keyboard( unsigned char key, int x, int y )
             model_view_start = Translate(-0.1,0,0)*model_view_start;
             break;
         case 'r': case 'R':
-             for (int i = 1; i < 5; i++){
+             for (int i = 0; i < 5; i++){
                  if (reroll[i] == 1) {
                      dieMoving[i] = true;
                      diePositions[i][1] = 2;
@@ -1265,8 +1273,8 @@ main( int argc, char **argv )
     // perform OpenGL initialization
     glutInit( &argc, argv );
     glutInitDisplayMode( GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH );
-    glutInitWindowSize( 512, 512 );
-    glutCreateWindow( "Pig" );
+    glutInitWindowSize( 1280, 720 );
+    glutCreateWindow( "Yahtzee" );
     glewInit();
     init();
     
