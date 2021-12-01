@@ -481,7 +481,10 @@ static void drawScore() {
     const char* lsLabel = "Large straight";
     const char* yzeLabel = "YAHTZEE";
     const char* bonus = "Bonus";
+    
 
+    model_view *= Scale(.2, .2, .2);
+    model_view *= Translate(-20, 25, -9.999);
     drawText(yourScoreCard);
     
 
@@ -1165,8 +1168,8 @@ main( int argc, char **argv )
     // perform OpenGL initialization
     glutInit( &argc, argv );
     glutInitDisplayMode( GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH );
-    glutInitWindowSize( 512, 512 );
-    glutCreateWindow( "Pig" );
+    glutInitWindowSize( 1280, 720 );
+    glutCreateWindow( "Yahtzee" );
 	glewInit();
     init();
 	
